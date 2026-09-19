@@ -141,3 +141,32 @@ SQLite + 原始事件
 ```
 
 当前版本优先验证采集、持久化和控制台查询链路，编译 Worker、知识 Sink 和 LLMWikiNG 接入将在后续阶段实现。
+
+## Docker 镜像
+
+项目提供多阶段 `Dockerfile`，会自动构建 Vue 前端、Spring Boot JAR，并生成运行时镜像。
+
+本地构建：
+
+```bash
+docker build -t conversation-complier:local .
+docker run --rm -p 8080:8080 -v conversation-compiler-data:/app/data conversation-complier:local
+```
+
+### GitHub Actions 推送到 Docker Hub
+
+`.github/workflows/docker-publish.yml` 会在 `main` 分支收到提交时自动构建并推送镜像。合并 Pull Request 到 `main` 也会产生一次 `push` 事件，因此不会重复推送。
+
+在 GitHub 仓库的 **Settings → Secrets and variables → Actions** 中配置：
+
+- `DOCKERHUB_USERNAME`：Docker Hub 用户名
+- `DOCKERHUB_TOKEN`：Docker Hub Access Token，不要使用 Docker Hub 登录密码
+
+工作流默认推送到：
+
+```text
+<DOCKERHUB_USERNAME>/conversation-complier:latest
+<DOCKERHUB_USERNAME>/conversation-complier:sha-<commit>
+```
+
+Docker Hub 中需要预先创建名为 `conversation-complier` 的镜像仓库，并确保 Access Token 具备推送权限。
