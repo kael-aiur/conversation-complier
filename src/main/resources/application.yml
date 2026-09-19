@@ -1,0 +1,6 @@
+spring:
+  application:
+    name: conversation-compiler
+
+server:
+  port: 8080
