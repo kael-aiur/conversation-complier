@@ -1,6 +1,16 @@
 spring:
   application:
     name: conversation-compiler
+  datasource:
+    url: jdbc:sqlite:${CONVERSATION_COMPILER_DB:./data/conversation-compiler.db}
+    driver-class-name: org.sqlite.JDBC
+  sql:
+    init:
+      mode: always
 
 server:
   port: 8080
+
+agent-trace:
+  # Leave empty for local development. Set AGENT_TRACE_AUTH_KEY in network deployments.
+  auth-key: ${AGENT_TRACE_AUTH_KEY:}
