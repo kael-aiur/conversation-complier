@@ -122,3 +122,16 @@ h1 { margin: 0; color: #172033; font-size: 28px; line-height: 1.2; }
 .events-loading { padding: 8px 0; }
 .api-error { margin-left: 10px; color: #e56b6f; }
 .session-table .el-table__row { cursor: pointer; }
+
+.event-marker--llm_request { background: #6f8ce8; }
+.event-marker--llm_response { background: #5b9bd5; }
+.event-marker--error { background: #e56b6f; }
+.event-marker--session_start, .event-marker--session_end { background: #7f8c9a; }
+.event-bubble--llm_request, .event-bubble--llm_response { border-color: #d7e1f7; background: #f5f8ff; }
+.event-bubble--error { border-color: #f3cccc; background: #fff7f7; }
+.event-bubble--session_start, .event-bubble--session_end { border-color: #e1e6eb; background: #f8fafc; }
+.tool-call-details { display: flex; flex-direction: column; gap: 9px; margin-top: 11px; padding-top: 10px; border-top: 1px dashed #d9cffa; }
+.tool-call-field { display: flex; flex-direction: column; gap: 5px; }
+.tool-call-field > span { color: #8877b8; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.tool-call-field > code { align-self: flex-start; margin-top: 0; color: #694bb2; background: rgba(155, 123, 232, .14); font-size: 11px; font-weight: 700; }
+.tool-call-field > pre { max-height: 260px; margin: 0; overflow: auto; padding: 9px 10px; border: 1px solid #e5dcf8; border-radius: 6px; color: #5b4d7c; background: rgba(255,255,255,.7); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }

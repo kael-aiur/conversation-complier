@@ -104,12 +104,17 @@ function normalizeEvent(event) {
   const payload = parsePayload(event.payloadJson)
   const data = payload.data || {}
   const type = event.eventType || 'event'
+  const isToolCall = type === 'tool_call'
+  const tool = data.tool_name || data.tool || data.name || ''
+  const argumentsValue = data.arguments ?? data.input ?? data.parameters ?? null
   return {
     type,
+    styleType: type === 'assistant_response' ? 'assistant_message' : type,
     label: eventLabel(type),
     time: formatEventTime(event.eventTimestamp || event.receivedAt),
-    content: extractEventContent(data, payload),
-    tool: data.tool_name || data.tool || data.name || '',
+    content: isToolCall ? `调用工具：${tool || '未命名工具'}` : extractEventContent(data, payload),
+    tool,
+    arguments: isToolCall ? formatArguments(argumentsValue) : '',
   }
 }
 
@@ -118,6 +123,13 @@ function parsePayload(payloadJson) {
     const normalized = String(payloadJson || '{}').trim().replace(/\\n\s*$/, '')
     return JSON.parse(normalized)
   } catch { return {} }
+}
+
+
+function formatArguments(value) {
+  if (value === null || value === undefined || value === '') return '无参数'
+  if (typeof value === 'string') return value
+  try { return JSON.stringify(value, null, 2) } catch { return String(value) }
 }
 
 function extractEventContent(data, payload) {
@@ -269,11 +281,15 @@ function eventIcon(type) {
         <div v-if="loadingEvents" class="events-loading"><el-skeleton :rows="6" animated /></div>
       <el-empty v-else-if="selectedEvents.length === 0" description="暂无事件" />
       <div v-else v-for="event in selectedEvents" :key="`${event.time}-${event.type}`" class="event-item">
-          <div class="event-marker" :class="`event-marker--${event.type}`">{{ eventIcon(event.type) }}</div>
-          <div class="event-bubble" :class="`event-bubble--${event.type}`">
+          <div class="event-marker" :class="`event-marker--${event.styleType}`">{{ eventIcon(event.type) }}</div>
+          <div class="event-bubble" :class="`event-bubble--${event.styleType}`">
             <div class="event-meta"><strong>{{ event.label }}</strong><time>{{ event.time }}</time></div>
             <p>{{ event.content }}</p>
-            <code v-if="event.tool">{{ event.tool }}</code>
+            <div v-if="event.type === 'tool_call'" class="tool-call-details">
+              <div class="tool-call-field"><span>工具</span><code>{{ event.tool || '未命名工具' }}</code></div>
+              <div class="tool-call-field"><span>参数</span><pre>{{ event.arguments }}</pre></div>
+            </div>
+            <code v-else-if="event.tool">{{ event.tool }}</code>
           </div>
         </div>
       </div>
