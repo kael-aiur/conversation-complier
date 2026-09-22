@@ -21,7 +21,7 @@ public class ConversationCompileScheduler {
         if (config == null || !config.enabled() || config.intervalMinutes() < 1 || config.providerId() == null || config.modelName() == null) return;
         double cutoff = System.currentTimeMillis() / 1000.0 - config.intervalMinutes() * 60.0;
         conversations.findIdleCandidates(cutoff, 20).forEach(conversation -> {
-            if (!runs.hasActiveRun(conversation.sessionId())) {
+            if (!runs.hasActiveRun(conversation.sessionId()) && !runs.hasFailedRunAtVersion(conversation.sessionId(), conversation.version())) {
                 long from = conversation.compiledVersion() + 1;
                 try { runs.createPending(conversation.sessionId(), from, conversation.version(), 0, 0, conversation.version() - conversation.compiledVersion(), CompileTriggerType.scheduler); }
                 catch (org.springframework.dao.DataIntegrityViolationException ignored) { /* another scheduler won the claim */ }

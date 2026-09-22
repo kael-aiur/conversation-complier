@@ -49,6 +49,11 @@ public class JdbcCompileRunRepository implements CompileRunRepository {
     public List<Long> findPendingIds(int limit) { return jdbc.queryForList("SELECT id FROM compile_runs WHERE status='pending' ORDER BY id ASC LIMIT ?", Long.class, limit); }
 
     @Override
+    public boolean hasFailedRunAtVersion(String sessionId, long version) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM compile_runs WHERE session_id=? AND status='failed' AND to_version=?", Integer.class, sessionId, version) > 0;
+    }
+
+    @Override
     public long createPending(String sessionId, long fromVersion, long toVersion, long fromEventId,
                               long toEventId, long eventCount, CompileTriggerType triggerType) {
         String now = Instant.now().toString();
@@ -78,5 +83,5 @@ public class JdbcCompileRunRepository implements CompileRunRepository {
                     r.getString("created_at"), r.getString("updated_at"));
         };
     }
-    private long nullableLong(java.sql.ResultSet r, String column) throws java.sql.SQLException { Long value = (Long) r.getObject(column); return value == null ? 0 : value; }
+    private long nullableLong(java.sql.ResultSet r, String column) throws java.sql.SQLException { Number value = (Number) r.getObject(column); return value == null ? 0 : value.longValue(); }
 }

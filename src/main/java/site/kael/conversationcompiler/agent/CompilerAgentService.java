@@ -70,7 +70,7 @@ public class CompilerAgentService {
             CompileResultRequest result = collector.get();
             if (result == null) throw new IllegalStateException("compiler agent did not call compile_result");
             return result;
-        } catch (Exception e) { throw new IllegalStateException("compiler agent failed", e); }
+        } catch (Exception e) { String detail = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage(); throw new IllegalStateException("compiler agent failed: " + detail, e); }
         finally { collector.clear(); }
     }
 

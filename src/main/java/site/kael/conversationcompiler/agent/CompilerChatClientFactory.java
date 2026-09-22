@@ -8,6 +8,10 @@ import org.springframework.ai.chat.client.advisor.ToolCallingAdvisor;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.stereotype.Component;
+import java.time.Duration;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
+import java.net.URI;
 import site.kael.conversationcompiler.common.BadRequestException;
 import site.kael.conversationcompiler.domain.settings.InterfaceType;
 import site.kael.conversationcompiler.infrastructure.crypto.ApiKeyEncryptionService;
@@ -25,12 +29,19 @@ public class CompilerChatClientFactory {
         String apiKey = crypto.decrypt(providers.findEncryptedApiKey(providerId));
         org.springframework.ai.chat.model.ChatModel model;
         if (provider.interfaceType() == InterfaceType.anthropic) {
-            var options = AnthropicChatOptions.builder().baseUrl(provider.baseUrl()).apiKey(apiKey).model(Model.of(modelName)).build();
+            var options = AnthropicChatOptions.builder().baseUrl(provider.baseUrl()).apiKey(apiKey).model(Model.of(modelName)).timeout(Duration.ofSeconds(45)).maxRetries(0).proxy(proxy()).build();
             model = AnthropicChatModel.builder().options(options).build();
         } else {
-            var options = OpenAiChatOptions.builder().baseUrl(provider.baseUrl()).apiKey(apiKey).model(modelName).build();
+            var options = OpenAiChatOptions.builder().baseUrl(provider.baseUrl()).apiKey(apiKey).model(modelName).timeout(Duration.ofSeconds(45)).maxRetries(0).proxy(proxy()).build();
             model = OpenAiChatModel.builder().options(options).build();
         }
         return ChatClient.builder(model).defaultAdvisors(ToolCallingAdvisor.builder().disableInternalConversationHistory().build()).build();
+    }
+    private Proxy proxy() {
+        String value = System.getenv("CONVERSATION_COMPILER_HTTP_PROXY");
+        if (value == null || value.isBlank()) value = System.getenv("HTTPS_PROXY");
+        if (value == null || value.isBlank()) return Proxy.NO_PROXY;
+        try { URI uri = URI.create(value); return new Proxy(Proxy.Type.HTTP, new InetSocketAddress(uri.getHost(), uri.getPort() > 0 ? uri.getPort() : 80)); }
+        catch (Exception ignored) { return Proxy.NO_PROXY; }
     }
 }

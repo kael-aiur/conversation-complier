@@ -35,6 +35,7 @@ public class CompileRunWorker {
             var setting = settings.find().orElseThrow(() -> new IllegalStateException("knowledge compile settings are not configured"));
             if (!execution.markRunning(id, "loading_events", setting.providerId(), setting.modelName(), setting.prompt())) return;
             var list = events.findBySessionId(run.sessionId(), (int) Math.min(run.eventCount(), 5000), Math.max((int) run.fromVersion() - 1, 0));
+            execution.markRunning(id, "agent_running", setting.providerId(), setting.modelName(), setting.prompt());
             var observer = new site.kael.conversationcompiler.agent.ModelFailoverRunner.AttemptObserver() {
                 public void started(String candidate, int attempt) {
                     String[] parts = candidate.split("\\n", 2);
