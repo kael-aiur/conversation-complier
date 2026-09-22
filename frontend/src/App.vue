@@ -6,11 +6,16 @@ import {
   Connection,
   DataAnalysis,
   Document,
+  Tickets,
   Fold,
   FullScreen,
   Menu as MenuIcon,
   Monitor,
   Search,
+  Edit,
+  Plus,
+  Delete,
+  Setting,
   User,
 } from '@element-plus/icons-vue'
 
@@ -20,13 +25,36 @@ const apiStatus = ref('未检查')
 const checking = ref(false)
 const loadingSessions = ref(false)
 const loadingEvents = ref(false)
+const loadingCompileRuns = ref(false)
+const loadingCompileDetail = ref(false)
 const apiError = ref('')
 const searchText = ref('')
 const drawerVisible = ref(false)
 const selectedSession = ref(null)
 const selectedEvents = ref([])
+const compileDrawerVisible = ref(false)
+const selectedCompileRun = ref(null)
+const settingsTab = ref('knowledge')
+const providerDrawerVisible = ref(false)
+const providerDrawerMode = ref('create')
+const providerDrawerError = ref('')
+const fetchingProviderModels = ref(false)
+const providerModelsFetched = ref(false)
+const selectedProviderId = ref('provider-openai')
+const selectedModel = ref('gpt-4o-mini')
+const compileInterval = ref(30)
+const compilePrompt = ref('提取稳定事实、已确认的项目决策、用户明确表达的偏好和可复用流程。忽略普通问答、临时调试、助手推测和敏感凭据。')
+const providerForm = ref(createProviderForm())
+const compileSessionFilter = ref('')
+
+const providers = ref([])
+
+function createProviderForm() {
+  return { id: '', name: '', type: 'responses', baseUrl: '', apiKey: '', models: [], modelsFetchedAt: '' }
+}
 
 const sessions = ref([])
+const compileRuns = ref([])
 
 
 const filteredSessions = computed(() => {
@@ -42,7 +70,12 @@ const metrics = computed(() => [
   { label: '知识条目', value: '--', icon: Document, color: 'green', trend: '接口待接入' },
 ])
 
-const pageTitle = computed(() => activeMenu.value === 'sessions' ? '会话列表' : '会话列表')
+const pageTitle = computed(() => ({ sessions: '会话列表', 'compile-runs': '整理记录', settings: '知识整理设置' }[activeMenu.value] || '会话列表'))
+const filteredCompileRuns = computed(() => compileSessionFilter.value
+  ? compileRuns.value.filter((run) => run.sessionId === compileSessionFilter.value)
+  : compileRuns.value)
+const selectedProvider = computed(() => providers.value.find((provider) => provider.id === selectedProviderId.value))
+const providerModels = computed(() => selectedProvider.value?.models || [])
 
 async function checkApi() {
   checking.value = true
@@ -80,6 +113,65 @@ async function loadSessions() {
     apiStatus.value = '无法连接后端'
   } finally {
     loadingSessions.value = false
+  }
+}
+
+async function loadCompileRuns() {
+  loadingCompileRuns.value = true
+  try {
+    const response = await fetch('/api/v1/compile-runs?limit=100&offset=0')
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const data = await response.json()
+    compileRuns.value = data.map(normalizeCompileRun)
+  } catch (error) {
+    apiError.value = `整理记录加载失败：${error.message}`
+  } finally {
+    loadingCompileRuns.value = false
+  }
+}
+
+async function loadProviders() {
+  try {
+    const response = await fetch('/api/v1/model-providers')
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const data = await response.json()
+    providers.value = data.map(normalizeProvider)
+    if (!selectedProviderId.value || !providers.value.some((p) => p.id === selectedProviderId.value)) {
+      selectedProviderId.value = providers.value[0]?.id || ''
+    }
+    selectedModel.value = selectedProvider.value?.models?.[0] || ''
+  } catch (error) {
+    apiError.value = `模型供应商加载失败：${error.message}`
+  }
+}
+
+async function loadKnowledgeSettings() {
+  try {
+    const response = await fetch('/api/v1/settings/knowledge')
+    if (response.status === 204) return
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const data = await response.json()
+    selectedProviderId.value = data.providerId || selectedProviderId.value
+    selectedModel.value = data.modelName || selectedModel.value
+    compileInterval.value = data.intervalMinutes || 30
+    compilePrompt.value = data.prompt || ''
+  } catch (error) {
+    apiError.value = `知识整理设置加载失败：${error.message}`
+  }
+}
+
+function normalizeProvider(provider) {
+  return { ...provider, type: provider.interfaceType, apiKey: provider.apiKeyMasked || '', models: provider.models || [] }
+}
+
+function normalizeCompileRun(run) {
+  return {
+    ...run,
+    sessionTitle: run.sessionTitle || run.sessionId,
+    knowledgeCount: run.knowledgeCount || 0,
+    startedAt: formatUpdatedAt(run.startedAt),
+    duration: run.durationSeconds ? `${Math.floor(run.durationSeconds / 60)} 分 ${run.durationSeconds % 60} 秒` : (run.status === 'running' ? '进行中' : '暂无'),
+    knowledge: [],
   }
 }
 
@@ -168,7 +260,7 @@ function formatUpdatedAt(value) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-onMounted(loadSessions)
+onMounted(() => { loadSessions(); loadCompileRuns(); loadProviders(); loadKnowledgeSettings() })
 
 function toggleSidebar() {
   isCollapsed.value = !isCollapsed.value
@@ -180,6 +272,109 @@ function statusLabel(status) {
 
 function statusType(status) {
   return { active: 'success', stale: 'warning', compiling: 'primary', compiled: 'info' }[status] || 'info'
+}
+
+function compileStatusLabel(status) {
+  return { completed: '已完成', running: '整理中', failed: '失败' }[status] || status
+}
+
+function compileStatusType(status) {
+  return { completed: 'success', running: 'primary', failed: 'danger' }[status] || 'info'
+}
+
+function openProviderCreate() {
+  providerDrawerMode.value = 'create'
+  providerDrawerError.value = ''
+  providerModelsFetched.value = false
+  providerForm.value = createProviderForm()
+  providerDrawerVisible.value = true
+}
+
+function openProviderEdit(provider) {
+  providerDrawerMode.value = 'edit'
+  providerDrawerError.value = ''
+  providerModelsFetched.value = false
+  providerForm.value = { ...provider, apiKey: '', models: [...provider.models] }
+  providerDrawerVisible.value = true
+}
+
+async function fetchProviderModels() {
+  if (!providerForm.value.baseUrl.trim() || !providerForm.value.type || !providerForm.value.apiKey.trim()) {
+    providerDrawerError.value = '请填写接口类型、Base URL 和 API Key 后获取模型'
+    return
+  }
+  fetchingProviderModels.value = true
+  providerDrawerError.value = ''
+  try {
+    const response = await fetch('/api/v1/model-providers/fetch-models', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ interfaceType: providerForm.value.type, baseUrl: providerForm.value.baseUrl, apiKey: providerForm.value.apiKey }),
+    })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const data = await response.json()
+    providerForm.value.models = data.models || []
+    providerForm.value.modelsFetchedAt = data.fetchedAt || '刚刚'
+    providerModelsFetched.value = providerForm.value.models.length > 0
+  } catch (error) {
+    providerDrawerError.value = `模型获取失败：${error.message}`
+  } finally {
+    fetchingProviderModels.value = false
+  }
+}
+
+async function saveProvider() {
+  if (!providerModelsFetched.value) { providerDrawerError.value = '请先点击“获取”加载可用模型列表后再保存'; return }
+  if (!providerForm.value.name.trim() || !providerForm.value.baseUrl.trim()) { providerDrawerError.value = '请完整填写供应商名称和 Base URL'; return }
+  const payload = { name: providerForm.value.name, interfaceType: providerForm.value.type, baseUrl: providerForm.value.baseUrl, apiKey: providerDrawerMode.value === 'edit' && providerForm.value.apiKey.includes('••••') ? '' : providerForm.value.apiKey, models: providerForm.value.models, modelsFetchedAt: providerForm.value.modelsFetchedAt, enabled: true }
+  try {
+    const url = providerDrawerMode.value === 'create' ? '/api/v1/model-providers' : `/api/v1/model-providers/${providerForm.value.id}`
+    const response = await fetch(url, { method: providerDrawerMode.value === 'create' ? 'POST' : 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    providerDrawerVisible.value = false
+    await loadProviders()
+  } catch (error) { providerDrawerError.value = `保存失败：${error.message}` }
+}
+
+async function deleteProvider(provider) {
+  if (!window.confirm(`确认删除供应商“${provider.name}”吗？`)) return
+  try {
+    const response = await fetch(`/api/v1/model-providers/${provider.id}`, { method: 'DELETE' })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    await loadProviders()
+  } catch (error) { apiError.value = `删除供应商失败：${error.message}` }
+}
+
+async function saveKnowledgeSettings() {
+  try {
+    const response = await fetch('/api/v1/settings/knowledge', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ providerId: selectedProviderId.value, modelName: selectedModel.value, intervalMinutes: compileInterval.value, prompt: compilePrompt.value, enabled: true }) })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    apiError.value = ''
+  } catch (error) { apiError.value = `知识整理设置保存失败：${error.message}` }
+}
+
+function handleProviderChange(providerId) {
+  selectedModel.value = providers.value.find((provider) => provider.id === providerId)?.models[0] || ''
+}
+
+async function openCompileRun(run) {
+  selectedCompileRun.value = run
+  selectedCompileRun.value.knowledge = []
+  compileDrawerVisible.value = true
+  loadingCompileDetail.value = true
+  try {
+    const [detailResponse, itemsResponse] = await Promise.all([
+      fetch(`/api/v1/compile-runs/${run.id}`),
+      fetch(`/api/v1/compile-runs/${run.id}/knowledge-items`),
+    ])
+    if (!detailResponse.ok || !itemsResponse.ok) throw new Error('整理记录详情加载失败')
+    const detail = await detailResponse.json()
+    const items = await itemsResponse.json()
+    selectedCompileRun.value = { ...normalizeCompileRun(detail), knowledge: items.map((item) => item.summary || item.title) }
+  } catch (error) {
+    apiError.value = error.message
+  } finally {
+    loadingCompileDetail.value = false
+  }
 }
 
 function eventIcon(type) {
@@ -199,6 +394,14 @@ function eventIcon(type) {
         <el-menu-item index="sessions">
           <el-icon><ChatDotRound /></el-icon>
           <template #title>会话列表</template>
+        </el-menu-item>
+        <el-menu-item index="compile-runs">
+          <el-icon><Tickets /></el-icon>
+          <template #title>整理记录</template>
+        </el-menu-item>
+        <el-menu-item index="settings">
+          <el-icon><Setting /></el-icon>
+          <template #title>知识整理设置</template>
         </el-menu-item>
       </el-menu>
 
@@ -227,38 +430,109 @@ function eventIcon(type) {
           <div>
             <p class="eyebrow">CONVERSATION COMPILER</p>
             <h1>{{ pageTitle }}</h1>
-            <p class="page-description">查看采集到的 Agent 会话，以及知识编译进度。</p>
+            <p class="page-description">{{ activeMenu === 'sessions' ? '查看采集到的 Agent 会话，以及知识编译进度。' : '查看每个会话的知识整理任务、处理范围和输出结果。' }}</p>
           </div>
-          <el-button type="primary" :loading="checking" @click="checkApi"><el-icon><Monitor /></el-icon>检查后端连接</el-button>
+          <el-button v-if="activeMenu === 'sessions'" type="primary" :loading="checking" @click="checkApi"><el-icon><Monitor /></el-icon>检查后端连接</el-button>
         </div>
 
-        <el-row :gutter="16" class="overview-grid">
-          <el-col v-for="metric in metrics" :key="metric.label" :xs="24" :sm="12" :lg="6">
-            <el-card shadow="never" class="metric-card">
-              <div class="metric-icon" :class="`metric-icon--${metric.color}`"><el-icon><component :is="metric.icon" /></el-icon></div>
-              <div class="metric-copy"><span class="metric-label">{{ metric.label }}</span><strong>{{ metric.value }}</strong><small>{{ metric.trend }}</small></div>
-            </el-card>
-          </el-col>
-        </el-row>
+        <template v-if="activeMenu === 'sessions'">
+          <el-row :gutter="16" class="overview-grid">
+            <el-col v-for="metric in metrics" :key="metric.label" :xs="24" :sm="12" :lg="6">
+              <el-card shadow="never" class="metric-card">
+                <div class="metric-icon" :class="`metric-icon--${metric.color}`"><el-icon><component :is="metric.icon" /></el-icon></div>
+                <div class="metric-copy"><span class="metric-label">{{ metric.label }}</span><strong>{{ metric.value }}</strong><small>{{ metric.trend }}</small></div>
+              </el-card>
+            </el-col>
+          </el-row>
 
-        <el-card shadow="never" class="session-card">
-          <template #header>
-            <div class="card-header">
-              <div><strong>最近会话</strong><span>共 {{ filteredSessions.length }} 条记录</span></div>
-              <el-input v-model="searchText" clearable placeholder="搜索会话" :prefix-icon="Search" class="search-input" />
-            </div>
-          </template>
-          <el-table v-loading="loadingSessions" :data="filteredSessions" class="session-table" row-class-name="session-row" @row-click="openSession">
-            <el-table-column label="会话" min-width="300">
-              <template #default="{ row }"><div class="session-title"><span class="session-dot" :class="`session-dot--${row.status}`"></span><div><strong>{{ row.title }}</strong><small>{{ row.id }}</small></div></div></template>
-            </el-table-column>
-            <el-table-column prop="source" label="来源" width="125" />
-            <el-table-column label="状态" width="120"><template #default="{ row }"><el-tag :type="statusType(row.status)" effect="light" round>{{ statusLabel(row.status) }}</el-tag></template></el-table-column>
-            <el-table-column label="事件数" width="100"><template #default="{ row }"><span class="event-count">{{ row.events }}</span></template></el-table-column>
-            <el-table-column label="编译进度" width="170"><template #default="{ row }"><el-progress :percentage="row.progress" :status="row.progress === 100 ? 'success' : undefined" :stroke-width="7" /></template></el-table-column>
-            <el-table-column prop="updated" label="最近更新" width="120" />
-          </el-table>
-        </el-card>
+          <el-card shadow="never" class="session-card">
+            <template #header>
+              <div class="card-header">
+                <div><strong>最近会话</strong><span>共 {{ filteredSessions.length }} 条记录</span></div>
+                <el-input v-model="searchText" clearable placeholder="搜索会话" :prefix-icon="Search" class="search-input" />
+              </div>
+            </template>
+            <el-table v-loading="loadingSessions" :data="filteredSessions" class="session-table" row-class-name="session-row" @row-click="openSession">
+              <el-table-column label="会话" min-width="300">
+                <template #default="{ row }"><div class="session-title"><span class="session-dot" :class="`session-dot--${row.status}`"></span><div><strong>{{ row.title }}</strong><small>{{ row.id }}</small></div></div></template>
+              </el-table-column>
+              <el-table-column prop="source" label="来源" width="125" />
+              <el-table-column label="状态" width="120"><template #default="{ row }"><el-tag :type="statusType(row.status)" effect="light" round>{{ statusLabel(row.status) }}</el-tag></template></el-table-column>
+              <el-table-column label="事件数" width="100"><template #default="{ row }"><span class="event-count">{{ row.events }}</span></template></el-table-column>
+              <el-table-column label="编译进度" width="170"><template #default="{ row }"><el-progress :percentage="row.progress" :status="row.progress === 100 ? 'success' : undefined" :stroke-width="7" /></template></el-table-column>
+              <el-table-column prop="updated" label="最近更新" width="120" />
+            </el-table>
+          </el-card>
+        </template>
+
+        <template v-else-if="activeMenu === 'compile-runs'">
+          <el-row :gutter="16" class="overview-grid">
+            <el-col :xs="24" :sm="8"><el-card shadow="never" class="metric-card"><div class="metric-icon metric-icon--purple"><el-icon><Tickets /></el-icon></div><div class="metric-copy"><span class="metric-label">整理次数</span><strong>{{ compileRuns.length }}</strong><small>全部会话</small></div></el-card></el-col>
+            <el-col :xs="24" :sm="8"><el-card shadow="never" class="metric-card"><div class="metric-icon metric-icon--green"><el-icon><Document /></el-icon></div><div class="metric-copy"><span class="metric-label">生成知识条目</span><strong>{{ compileRuns.reduce((sum, run) => sum + run.knowledgeCount, 0) }}</strong><small>模拟统计</small></div></el-card></el-col>
+            <el-col :xs="24" :sm="8"><el-card shadow="never" class="metric-card"><div class="metric-icon metric-icon--orange"><el-icon><Clock /></el-icon></div><div class="metric-copy"><span class="metric-label">整理中</span><strong>{{ compileRuns.filter((run) => run.status === 'running').length }}</strong><small>当前任务</small></div></el-card></el-col>
+          </el-row>
+
+          <el-card shadow="never" class="session-card compile-card">
+            <template #header>
+              <div class="card-header">
+                <div><strong>整理记录</strong><span>共 {{ filteredCompileRuns.length }} 条记录</span></div>
+                <el-select v-model="compileSessionFilter" clearable filterable placeholder="按会话筛选" class="session-filter">
+                  <el-option v-for="run in compileRuns" :key="run.sessionId" :label="run.sessionTitle" :value="run.sessionId" />
+                </el-select>
+              </div>
+            </template>
+            <el-table v-loading="loadingCompileRuns" :data="filteredCompileRuns" class="session-table" @row-click="openCompileRun">
+              <el-table-column label="整理记录" min-width="300"><template #default="{ row }"><div class="session-title"><span class="run-status-dot" :class="`run-status-dot--${row.status}`"></span><div><strong>{{ row.sessionTitle }}</strong><small>{{ row.id }} · {{ row.sessionId }}</small></div></div></template></el-table-column>
+              <el-table-column label="状态" width="120"><template #default="{ row }"><el-tag :type="compileStatusType(row.status)" effect="light" round>{{ compileStatusLabel(row.status) }}</el-tag></template></el-table-column>
+              <el-table-column label="处理范围" width="150"><template #default="{ row }"><span class="version-range">v{{ row.fromVersion }} → v{{ row.toVersion }}</span></template></el-table-column>
+              <el-table-column label="知识条目" width="110"><template #default="{ row }"><span class="event-count">{{ row.knowledgeCount }}</span></template></el-table-column>
+              <el-table-column prop="startedAt" label="开始时间" width="125" />
+              <el-table-column prop="duration" label="耗时" width="110" />
+            </el-table>
+          </el-card>
+        </template>
+
+        <template v-else>
+          <el-card shadow="never" class="settings-card">
+            <el-tabs v-model="settingsTab" class="settings-tabs">
+              <el-tab-pane label="知识整理" name="knowledge">
+                <el-form label-position="top" class="settings-form">
+                  <el-form-item label="模型选择">
+                    <div class="cascading-model-select">
+                      <el-select v-model="selectedProviderId" class="provider-select" placeholder="选择供应商" @change="handleProviderChange">
+                        <el-option v-for="provider in providers" :key="provider.id" :label="provider.name" :value="provider.id" />
+                      </el-select>
+                      <span class="select-arrow">/</span>
+                      <el-select v-model="selectedModel" class="model-select" popper-class="model-select-popper" placeholder="选择模型" :disabled="!selectedProvider">
+                        <el-option v-for="model in providerModels" :key="model" :label="model" :value="model" />
+                      </el-select>
+                    </div>
+                    <span class="form-help">先选择供应商，再选择该供应商已获取的模型。</span>
+                  </el-form-item>
+                  <el-form-item label="整理间隔">
+                    <div class="interval-input"><el-input-number v-model="compileInterval" :min="1" :step="1" controls-position="right" /><span>分钟</span></div>
+                    <span class="form-help">会话超过该空闲时间后，进入待整理队列。</span>
+                  </el-form-item>
+                  <el-form-item label="整理要求">
+                    <el-input v-model="compilePrompt" type="textarea" :rows="8" placeholder="输入知识整理 Prompt" />
+                    <span class="form-help">这些要求会作为编译器的基础提示词。</span>
+                  </el-form-item>
+                  <div class="settings-actions"><el-button type="primary" @click="saveKnowledgeSettings">保存知识整理设置</el-button></div>
+                </el-form>
+              </el-tab-pane>
+              <el-tab-pane label="模型供应商" name="providers">
+                <div class="provider-toolbar"><div><strong>模型供应商</strong><span>管理用于知识整理的模型接口</span></div><el-button type="primary" @click="openProviderCreate"><el-icon><Plus /></el-icon>新增供应商</el-button></div>
+                <el-table :data="providers" class="provider-table">
+                  <el-table-column label="供应商" min-width="190"><template #default="{ row }"><div class="provider-name"><span class="provider-mark">{{ row.name.slice(0, 1) }}</span><div><strong>{{ row.name }}</strong><small>{{ row.type }}</small></div></div></template></el-table-column>
+                  <el-table-column prop="baseUrl" label="Base URL" min-width="270" />
+                  <el-table-column label="可用模型" min-width="220"><template #default="{ row }"><div class="model-tags"><el-tag v-for="model in row.models" :key="model" size="small" effect="plain">{{ model }}</el-tag></div></template></el-table-column>
+                  <el-table-column prop="modelsFetchedAt" label="最近获取" width="120" />
+                  <el-table-column label="操作" width="130" fixed="right"><template #default="{ row }"><el-button text type="primary" @click="openProviderEdit(row)"><el-icon><Edit /></el-icon></el-button><el-button text type="danger" @click="deleteProvider(row)"><el-icon><Delete /></el-icon></el-button></template></el-table-column>
+                </el-table>
+              </el-tab-pane>
+            </el-tabs>
+          </el-card>
+        </template>
 
         <p class="api-status">后端状态：{{ apiStatus }} <span v-if="apiError" class="api-error">{{ apiError }}</span><span v-else class="mock-hint">数据来自后端 API</span></p>
       </el-main>
@@ -293,6 +567,50 @@ function eventIcon(type) {
           </div>
         </div>
       </div>
+    </el-drawer>
+    <el-drawer v-model="compileDrawerVisible" :size="isCollapsed ? 'calc(100vw - 72px)' : 'calc(100vw - 240px)'" direction="rtl" class="compile-drawer">
+      <template #header>
+        <div class="drawer-heading">
+          <div><strong>{{ selectedCompileRun?.sessionTitle || '整理记录' }}</strong><span>{{ selectedCompileRun?.id }} · {{ selectedCompileRun?.sessionId }}</span></div>
+          <el-tag v-if="selectedCompileRun" :type="compileStatusType(selectedCompileRun.status)" effect="light" round>{{ compileStatusLabel(selectedCompileRun.status) }}</el-tag>
+        </div>
+      </template>
+      <template v-if="selectedCompileRun">
+        <el-skeleton v-if="loadingCompileDetail" :rows="6" animated />
+        <template v-else>
+        <div class="compile-run-summary">
+          <div><span>整理范围</span><strong>v{{ selectedCompileRun.fromVersion }} → v{{ selectedCompileRun.toVersion }}</strong></div>
+          <div><span>开始时间</span><strong>{{ selectedCompileRun.startedAt }}</strong></div>
+          <div><span>耗时</span><strong>{{ selectedCompileRun.duration }}</strong></div>
+          <div><span>生成条目</span><strong>{{ selectedCompileRun.knowledgeCount }}</strong></div>
+        </div>
+        <el-divider content-position="left">整理结果</el-divider>
+        <section class="result-section">
+          <div class="result-section-title"><span class="result-icon result-icon--summary">∑</span><strong>结果总结</strong></div>
+          <p class="result-summary">{{ selectedCompileRun.summary }}</p>
+        </section>
+        <section class="result-section">
+          <div class="result-section-title"><span class="result-icon result-icon--knowledge">✓</span><strong>识别出的知识条目</strong><span class="result-count">{{ selectedCompileRun.knowledge.length }}</span></div>
+          <el-empty v-if="selectedCompileRun.knowledge.length === 0" description="本次未生成知识条目" />
+          <ul v-else class="knowledge-result-list"><li v-for="item in selectedCompileRun.knowledge" :key="item"><span class="knowledge-bullet">•</span>{{ item }}</li></ul>
+        </section>
+        </template>
+      </template>
+    </el-drawer>
+
+    <el-drawer v-model="providerDrawerVisible" :title="providerDrawerMode === 'create' ? '新增模型供应商' : '修改模型供应商'" :size="isCollapsed ? 'calc(100vw - 72px)' : 'calc(100vw - 240px)'" direction="rtl" class="provider-drawer">
+      <el-form label-position="top" class="provider-form">
+        <el-form-item label="供应商名称"><el-input v-model="providerForm.name" placeholder="例如：OpenAI" /></el-form-item>
+        <el-form-item label="接口类型"><el-select v-model="providerForm.type" class="full-width"><el-option label="Completions" value="completions" /><el-option label="Responses" value="responses" /><el-option label="Anthropic" value="anthropic" /></el-select></el-form-item>
+        <el-form-item label="Base URL"><el-input v-model="providerForm.baseUrl" placeholder="https://api.example.com/v1" /></el-form-item>
+        <el-form-item label="API Key"><el-input v-model="providerForm.apiKey" type="password" show-password placeholder="输入 API Key" /></el-form-item>
+        <el-form-item label="可用模型列表">
+          <div class="models-fetch-row"><el-button type="primary" plain :loading="fetchingProviderModels" @click="fetchProviderModels"><el-icon><Connection /></el-icon>获取</el-button><span v-if="providerModelsFetched" class="fetch-success">已获取 {{ providerForm.models.length }} 个模型</span><span v-else class="form-help">必须先获取模型列表才能保存</span></div>
+          <div v-if="providerForm.models.length" class="readonly-model-list"><el-tag v-for="model in providerForm.models" :key="model" effect="plain">{{ model }}</el-tag></div>
+        </el-form-item>
+        <el-alert v-if="providerDrawerError" :title="providerDrawerError" type="error" :closable="false" show-icon />
+        <div class="drawer-actions"><el-button @click="providerDrawerVisible = false">取消</el-button><el-button type="primary" :disabled="!providerModelsFetched" @click="saveProvider">保存</el-button></div>
+      </el-form>
     </el-drawer>
   </el-container>
 </template>

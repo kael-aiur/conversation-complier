@@ -1,0 +1,3 @@
+package site.kael.conversationcompiler.service.settings;
+import org.springframework.stereotype.Service; import site.kael.conversationcompiler.domain.settings.*; import site.kael.conversationcompiler.manager.settings.KnowledgeSettingsManager; import java.util.*;
+@Service public class KnowledgeSettingsService { private final KnowledgeSettingsManager manager; public KnowledgeSettingsService(KnowledgeSettingsManager m){manager=m;} public Optional<KnowledgeCompileSettings> get(){return manager.get();} public void save(KnowledgeSettingsRequest r){manager.save(r);} public List<ModelOptions> options(){return manager.options();} }

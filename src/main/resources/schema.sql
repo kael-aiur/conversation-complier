@@ -53,3 +53,53 @@ CREATE INDEX IF NOT EXISTS idx_events_session_id_id ON conversation_events(sessi
 CREATE INDEX IF NOT EXISTS idx_events_session_received ON conversation_events(session_id, received_at);
 CREATE INDEX IF NOT EXISTS idx_conversations_compile_scan ON conversations(status, last_event_at, version, compiled_version);
 CREATE INDEX IF NOT EXISTS idx_compile_runs_session ON compile_runs(session_id, started_at);
+
+CREATE TABLE IF NOT EXISTS model_providers (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    interface_type TEXT NOT NULL,
+    base_url TEXT NOT NULL,
+    api_key_ciphertext TEXT NOT NULL,
+    api_key_fingerprint TEXT,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS provider_models (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    provider_id TEXT NOT NULL,
+    model_name TEXT NOT NULL,
+    fetched_at TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    FOREIGN KEY (provider_id) REFERENCES model_providers(id) ON DELETE CASCADE,
+    UNIQUE(provider_id, model_name)
+);
+
+CREATE TABLE IF NOT EXISTS knowledge_compile_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    provider_id TEXT,
+    model_name TEXT,
+    interval_minutes INTEGER NOT NULL DEFAULT 30,
+    prompt TEXT NOT NULL DEFAULT '',
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (provider_id) REFERENCES model_providers(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS compile_run_knowledge_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    compile_run_id INTEGER NOT NULL,
+    item_key TEXT NOT NULL,
+    item_type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    action TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'candidate',
+    confidence REAL,
+    content TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (compile_run_id) REFERENCES compile_runs(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_compile_run_items_run ON compile_run_knowledge_items(compile_run_id);

@@ -1,0 +1,7 @@
+package site.kael.conversationcompiler.controller.settings;
+import org.junit.jupiter.api.Test; import org.springframework.test.web.servlet.MockMvc; import org.springframework.test.web.servlet.setup.MockMvcBuilders; import site.kael.conversationcompiler.domain.settings.*; import site.kael.conversationcompiler.service.settings.KnowledgeSettingsService; import java.util.*;
+import static org.mockito.Mockito.*; import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*; import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+class KnowledgeSettingsControllerTest { private final KnowledgeSettingsService service=mock(KnowledgeSettingsService.class); private final MockMvc mvc= MockMvcBuilders.standaloneSetup(new KnowledgeSettingsController(service)).build();
+ @Test void returnsModelOptions() throws Exception {when(service.options()).thenReturn(List.of(new ModelOptions("p","OpenAI",InterfaceType.responses,List.of("gpt"))));mvc.perform(get("/api/v1/settings/knowledge/model-options")).andExpect(status().isOk()).andExpect(jsonPath("$[0].models[0]").value("gpt"));}
+ @Test void savesSettings() throws Exception {mvc.perform(put("/api/v1/settings/knowledge").contentType("application/json").content("{\"providerId\":\"p\",\"modelName\":\"gpt\",\"intervalMinutes\":30,\"prompt\":\"x\"}")).andExpect(status().isNoContent());verify(service).save(any());}
+}

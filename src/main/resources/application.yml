@@ -14,3 +14,7 @@ server:
 agent-trace:
   # Leave empty for local development. Set AGENT_TRACE_AUTH_KEY in network deployments.
   auth-key: ${AGENT_TRACE_AUTH_KEY:}
+
+conversation-compiler:
+  security:
+    secret-key: ${CONVERSATION_COMPILER_SECRET_KEY:}
