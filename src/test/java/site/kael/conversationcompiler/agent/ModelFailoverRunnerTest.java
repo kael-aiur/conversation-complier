@@ -1,0 +1,4 @@
+package site.kael.conversationcompiler.agent;
+import org.junit.jupiter.api.Test; import java.util.List; import java.util.concurrent.atomic.AtomicInteger;
+import static org.assertj.core.api.Assertions.*;
+class ModelFailoverRunnerTest { @Test void retriesRateLimitOnSameModel(){var n=new AtomicInteger();String result=new ModelFailoverRunner().run(List.of("a","b"),m->{if(n.getAndIncrement()==0)throw new RuntimeException("HTTP 429");return m;});assertThat(result).isEqualTo("a");} @Test void failsOverAfterTwoRateLimitErrors(){var a=new AtomicInteger();String result=new ModelFailoverRunner().run(List.of("a","b"),m->{if(m.equals("a") && a.getAndIncrement()<2)throw new RuntimeException("HTTP 429");return m;});assertThat(result).isEqualTo("b");} @Test void doesNotFailOverOnBadRequest(){assertThatThrownBy(()->new ModelFailoverRunner().run(List.of("a","b"),m->{throw new RuntimeException("HTTP 400");})).hasMessageContaining("HTTP 400");} }

@@ -46,6 +46,9 @@ CREATE TABLE IF NOT EXISTS compile_runs (
     finished_at TEXT,
     result_json TEXT,
     error_message TEXT,
+    provider_id TEXT,
+    model_name TEXT,
+    prompt_snapshot TEXT,
     compiler_version TEXT NOT NULL DEFAULT 'mvp'
 );
 
@@ -99,7 +102,28 @@ CREATE TABLE IF NOT EXISTS compile_run_knowledge_items (
     status TEXT NOT NULL DEFAULT 'candidate',
     confidence REAL,
     content TEXT,
+    wiki TEXT,
+    slug TEXT,
+    content_hash TEXT,
     created_at TEXT NOT NULL,
     FOREIGN KEY (compile_run_id) REFERENCES compile_runs(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_compile_run_items_run ON compile_run_knowledge_items(compile_run_id);
+
+CREATE TABLE IF NOT EXISTS compile_run_attempts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    compile_run_id INTEGER NOT NULL,
+    attempt_number INTEGER NOT NULL,
+    provider_id TEXT,
+    model_name TEXT,
+    status TEXT NOT NULL,
+    error_type TEXT,
+    error_message TEXT,
+    tool_call_count INTEGER NOT NULL DEFAULT 0,
+    mcp_call_count INTEGER NOT NULL DEFAULT 0,
+    started_at TEXT,
+    finished_at TEXT,
+    FOREIGN KEY (compile_run_id) REFERENCES compile_runs(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_compile_run_attempts_run ON compile_run_attempts(compile_run_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_compile_runs_one_active_per_session ON compile_runs(session_id) WHERE status IN ('pending','running');

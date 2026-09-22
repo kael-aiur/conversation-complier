@@ -1,0 +1,3 @@
+package site.kael.conversationcompiler.agent;
+import io.modelcontextprotocol.spec.McpSchema; import org.junit.jupiter.api.Test; import org.springframework.ai.mcp.McpConnectionInfo; import static org.assertj.core.api.Assertions.assertThat;
+class CompilerMcpToolFilterConfigTest { @Test void allowsOnlyKnowledgeTools(){var f=new CompilerMcpToolFilterConfig().compilerMcpToolFilterBean(); var connection=org.mockito.Mockito.mock(McpConnectionInfo.class); assertThat(f.test(connection, new McpSchema.Tool("okf_search", "", "", java.util.Map.of(), null, null, null))).isTrue(); assertThat(f.test(connection, new McpSchema.Tool("okf_delete_page", "", "", java.util.Map.of(), null, null, null))).isFalse();} }

@@ -1,7 +1,7 @@
 package site.kael.conversationcompiler.infrastructure.database;
 
-import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
-import org.springframework.boot.context.properties.ConfigurationProperties;
+import com.zaxxer.hikari.HikariDataSource;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -12,10 +12,13 @@ import java.nio.file.Path;
 @Configuration
 public class DatabaseConfig {
     @Bean
-    @ConfigurationProperties("spring.datasource")
-    public DataSource dataSource(DataSourceProperties properties) {
-        createSqliteParentDirectory(properties.determineUrl());
-        return properties.initializeDataSourceBuilder().build();
+    public DataSource dataSource(@Value("${spring.datasource.url}") String url,
+                                 @Value("${spring.datasource.driver-class-name:org.sqlite.JDBC}") String driver) {
+        createSqliteParentDirectory(url);
+        HikariDataSource dataSource = new HikariDataSource();
+        dataSource.setJdbcUrl(url);
+        dataSource.setDriverClassName(driver);
+        return dataSource;
     }
 
     private void createSqliteParentDirectory(String url) {

@@ -12,4 +12,5 @@ public interface ConversationRepository {
     void updateAfterEvent(String sessionId, double eventTimestamp, String title);
     Optional<ConversationSummary> findById(String sessionId);
     List<ConversationSummary> findAll(int limit, int offset);
+    List<ConversationSummary> findIdleCandidates(double cutoffEpochSeconds, int limit);
 }

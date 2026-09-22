@@ -9,6 +9,7 @@ public interface CompileRunRepository {
     Optional<CompileRun> findById(long id);
     List<CompileRunKnowledgeItem> findKnowledgeItems(long runId);
     boolean hasActiveRun(String sessionId);
+    java.util.List<Long> findPendingIds(int limit);
     long createPending(String sessionId, long fromVersion, long toVersion, long fromEventId,
                        long toEventId, long eventCount, CompileTriggerType triggerType);
 }

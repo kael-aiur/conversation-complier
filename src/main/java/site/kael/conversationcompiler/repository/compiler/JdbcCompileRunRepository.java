@@ -37,13 +37,16 @@ public class JdbcCompileRunRepository implements CompileRunRepository {
         return jdbc.query("SELECT * FROM compile_run_knowledge_items WHERE compile_run_id=? ORDER BY id ASC", (r, n) ->
                 new CompileRunKnowledgeItem(r.getLong("id"), r.getLong("compile_run_id"), r.getString("item_key"),
                         r.getString("item_type"), r.getString("title"), r.getString("summary"), r.getString("action"),
-                        r.getString("status"), (Double) r.getObject("confidence"), r.getString("content"), r.getString("created_at")), runId);
+                        r.getString("status"), (Double) r.getObject("confidence"), r.getString("content"), r.getString("wiki"), r.getString("slug"), r.getString("content_hash"), r.getString("created_at")), runId);
     }
 
     @Override
     public boolean hasActiveRun(String sessionId) {
         return jdbc.queryForObject("SELECT COUNT(*) FROM compile_runs WHERE session_id=? AND status IN ('pending','running')", Integer.class, sessionId) > 0;
     }
+
+    @Override
+    public List<Long> findPendingIds(int limit) { return jdbc.queryForList("SELECT id FROM compile_runs WHERE status='pending' ORDER BY id ASC LIMIT ?", Long.class, limit); }
 
     @Override
     public long createPending(String sessionId, long fromVersion, long toVersion, long fromEventId,

@@ -7,6 +7,18 @@ spring:
   sql:
     init:
       mode: always
+  ai:
+    mcp:
+      client:
+        enabled: ${CONVERSATION_COMPILER_MCP_ENABLED:false}
+        type: SYNC
+        toolcallback:
+          enabled: true
+        streamable-http:
+          connections:
+            llmwiking:
+              url: ${LLMWIKING_MCP_URL:}
+              endpoint: ${LLMWIKING_MCP_ENDPOINT:}
 
 server:
   port: 8080
@@ -18,3 +30,10 @@ agent-trace:
 conversation-compiler:
   security:
     secret-key: ${CONVERSATION_COMPILER_SECRET_KEY:}
+  agent:
+    enabled: ${CONVERSATION_COMPILER_AGENT_ENABLED:false}
+  mcp:
+    auth-enabled: ${CONVERSATION_COMPILER_MCP_AUTH_ENABLED:false}
+  compiler:
+    enabled: ${CONVERSATION_COMPILER_COMPILER_ENABLED:false}
+    scan-interval-seconds: ${CONVERSATION_COMPILER_SCAN_INTERVAL_SECONDS:60}

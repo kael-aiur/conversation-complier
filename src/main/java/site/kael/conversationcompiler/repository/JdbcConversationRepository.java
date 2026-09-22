@@ -60,6 +60,11 @@ public class JdbcConversationRepository implements ConversationRepository {
     }
 
     @Override
+    public List<ConversationSummary> findIdleCandidates(double cutoffEpochSeconds, int limit) {
+        return jdbc.query("SELECT * FROM conversations WHERE status IN ('active','stale') AND version > compiled_version AND last_event_at <= ? ORDER BY last_event_at ASC LIMIT ?", mapper(), cutoffEpochSeconds, limit);
+    }
+
+    @Override
     public List<ConversationSummary> findAll(int limit, int offset) {
         return jdbc.query("SELECT * FROM conversations ORDER BY COALESCE(last_event_at, first_event_at, 0) DESC LIMIT ? OFFSET ?", mapper(), limit, offset);
     }
