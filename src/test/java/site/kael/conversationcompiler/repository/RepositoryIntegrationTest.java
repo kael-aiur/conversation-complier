@@ -24,6 +24,8 @@ class RepositoryIntegrationTest {
         conversations.updateAfterEvent("repo-session", 2d, "A title");
         assertThat(conversations.findById("repo-session")).isPresent();
         assertThat(events.findBySessionId("repo-session", 10, 0)).hasSize(1);
+        assertThat(events.findBySessionIdAndVersionRange("repo-session", 1, 1)).hasSize(1);
+        assertThat(events.findBySessionIdAndVersionRange("repo-session", 2, 2)).isEmpty();
         assertThat(events.insert("repo-session", "evt-1", "user_prompt", 2d, "now", "{}")).isFalse();
     }
 }

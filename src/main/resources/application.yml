@@ -37,3 +37,5 @@ conversation-compiler:
   compiler:
     enabled: ${CONVERSATION_COMPILER_COMPILER_ENABLED:false}
     scan-interval-seconds: ${CONVERSATION_COMPILER_SCAN_INTERVAL_SECONDS:60}
+    max-concurrent-runs: ${CONVERSATION_COMPILER_MAX_CONCURRENT_RUNS:1}
+    task-timeout-seconds: ${CONVERSATION_COMPILER_TASK_TIMEOUT_SECONDS:600}

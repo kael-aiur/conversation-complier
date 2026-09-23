@@ -49,6 +49,15 @@ CREATE TABLE IF NOT EXISTS compile_runs (
     provider_id TEXT,
     model_name TEXT,
     prompt_snapshot TEXT,
+    from_event_id INTEGER,
+    to_event_id INTEGER,
+    event_count INTEGER NOT NULL DEFAULT 0,
+    trigger_type TEXT NOT NULL DEFAULT 'scheduler',
+    summary TEXT,
+    knowledge_count INTEGER NOT NULL DEFAULT 0,
+    queued_at TEXT,
+    created_at TEXT,
+    updated_at TEXT,
     compiler_version TEXT NOT NULL DEFAULT 'mvp'
 );
 
