@@ -198,3 +198,18 @@ h1 { margin: 0; color: #172033; font-size: 28px; line-height: 1.2; }
   .select-arrow { display: none; }
   .provider-toolbar { align-items: flex-start; flex-direction: column; }
 }
+
+.settings-tab-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 22px 4px 0; }
+.settings-tab-header > div:first-child { display: flex; flex-direction: column; gap: 5px; }
+.settings-tab-header strong { color: var(--text-primary); font-size: 16px; }
+.settings-tab-header span { color: var(--text-secondary); font-size: 13px; }
+.settings-tab-actions { display: flex; align-items: center; gap: 8px; }
+.settings-form--readonly .el-form-item__label { color: var(--text-secondary); }
+.settings-form--readonly .el-input.is-disabled .el-input__wrapper,
+.settings-form--readonly .el-textarea.is-disabled .el-textarea__inner,
+.settings-form--readonly .el-input-number.is-disabled .el-input__wrapper,
+.settings-form--readonly .el-select .el-select__wrapper.is-disabled { background-color: #f8fafc; box-shadow: none; }
+.settings-form--readonly .el-input.is-disabled .el-input__inner,
+.settings-form--readonly .el-textarea.is-disabled .el-textarea__inner,
+.settings-form--readonly .el-input-number.is-disabled .el-input__inner,
+.settings-form--readonly .el-select .el-select__selected-item { color: var(--text-primary); -webkit-text-fill-color: var(--text-primary); }

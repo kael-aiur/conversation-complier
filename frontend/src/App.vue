@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import {
   ChatDotRound,
   Clock,
@@ -44,6 +45,8 @@ const selectedProviderId = ref('provider-openai')
 const selectedModel = ref('gpt-4o-mini')
 const compileInterval = ref(30)
 const compilePrompt = ref('提取稳定事实、已确认的项目决策、用户明确表达的偏好和可复用流程。忽略普通问答、临时调试、助手推测和敏感凭据。')
+const knowledgeSettingsEditing = ref(false)
+const savingKnowledgeSettings = ref(false)
 const providerForm = ref(createProviderForm())
 const compileSessionFilter = ref('')
 
@@ -155,6 +158,7 @@ async function loadKnowledgeSettings() {
     selectedModel.value = data.modelName || selectedModel.value
     compileInterval.value = data.intervalMinutes || 30
     compilePrompt.value = data.prompt || ''
+    knowledgeSettingsEditing.value = false
   } catch (error) {
     apiError.value = `知识整理设置加载失败：${error.message}`
   }
@@ -344,12 +348,30 @@ async function deleteProvider(provider) {
   } catch (error) { apiError.value = `删除供应商失败：${error.message}` }
 }
 
+function startKnowledgeSettingsEditing() {
+  knowledgeSettingsEditing.value = true
+  apiError.value = ''
+}
+
+async function cancelKnowledgeSettingsEditing() {
+  knowledgeSettingsEditing.value = false
+  await loadKnowledgeSettings()
+}
+
 async function saveKnowledgeSettings() {
+  savingKnowledgeSettings.value = true
   try {
     const response = await fetch('/api/v1/settings/knowledge', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ providerId: selectedProviderId.value, modelName: selectedModel.value, intervalMinutes: compileInterval.value, prompt: compilePrompt.value, enabled: true }) })
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     apiError.value = ''
-  } catch (error) { apiError.value = `知识整理设置保存失败：${error.message}` }
+    knowledgeSettingsEditing.value = false
+    ElMessage({ message: '知识整理设置保存成功', type: 'success', duration: 2200, showClose: true })
+  } catch (error) {
+    apiError.value = `知识整理设置保存失败：${error.message}`
+    ElMessage({ message: `保存失败：${error.message}`, type: 'error', duration: 3200, showClose: true })
+  } finally {
+    savingKnowledgeSettings.value = false
+  }
 }
 
 function handleProviderChange(providerId) {
@@ -496,28 +518,40 @@ function eventIcon(type) {
           <el-card shadow="never" class="settings-card">
             <el-tabs v-model="settingsTab" class="settings-tabs">
               <el-tab-pane label="知识整理" name="knowledge">
-                <el-form label-position="top" class="settings-form">
+                <div class="settings-tab-header">
+                  <div>
+                    <strong>知识整理规则</strong>
+                    <span>{{ knowledgeSettingsEditing ? '编辑模式：修改后点击保存' : '当前为只读状态' }}</span>
+                  </div>
+                  <div class="settings-tab-actions">
+                    <el-button v-if="!knowledgeSettingsEditing" type="primary" plain @click="startKnowledgeSettingsEditing"><el-icon><Edit /></el-icon>编辑</el-button>
+                    <template v-else>
+                      <el-button @click="cancelKnowledgeSettingsEditing">取消</el-button>
+                      <el-button type="primary" :loading="savingKnowledgeSettings" @click="saveKnowledgeSettings">保存设置</el-button>
+                    </template>
+                  </div>
+                </div>
+                <el-form label-position="top" class="settings-form" :class="{ 'settings-form--readonly': !knowledgeSettingsEditing }">
                   <el-form-item label="模型选择">
                     <div class="cascading-model-select">
-                      <el-select v-model="selectedProviderId" class="provider-select" placeholder="选择供应商" @change="handleProviderChange">
+                      <el-select v-model="selectedProviderId" class="provider-select" placeholder="选择供应商" :disabled="!knowledgeSettingsEditing" @change="handleProviderChange">
                         <el-option v-for="provider in providers" :key="provider.id" :label="provider.name" :value="provider.id" />
                       </el-select>
                       <span class="select-arrow">/</span>
-                      <el-select v-model="selectedModel" class="model-select" popper-class="model-select-popper" placeholder="选择模型" :disabled="!selectedProvider">
+                      <el-select v-model="selectedModel" class="model-select" popper-class="model-select-popper" placeholder="选择模型" :disabled="!knowledgeSettingsEditing || !selectedProvider">
                         <el-option v-for="model in providerModels" :key="model" :label="model" :value="model" />
                       </el-select>
                     </div>
                     <span class="form-help">先选择供应商，再选择该供应商已获取的模型。</span>
                   </el-form-item>
                   <el-form-item label="整理间隔">
-                    <div class="interval-input"><el-input-number v-model="compileInterval" :min="1" :step="1" controls-position="right" /><span>分钟</span></div>
+                    <div class="interval-input"><el-input-number v-model="compileInterval" :min="1" :step="1" controls-position="right" :disabled="!knowledgeSettingsEditing" /><span>分钟</span></div>
                     <span class="form-help">会话超过该空闲时间后，进入待整理队列。</span>
                   </el-form-item>
                   <el-form-item label="整理要求">
-                    <el-input v-model="compilePrompt" type="textarea" :rows="8" placeholder="输入知识整理 Prompt" />
+                    <el-input v-model="compilePrompt" type="textarea" :rows="8" placeholder="输入知识整理 Prompt" :disabled="!knowledgeSettingsEditing" />
                     <span class="form-help">这些要求会作为编译器的基础提示词。</span>
                   </el-form-item>
-                  <div class="settings-actions"><el-button type="primary" @click="saveKnowledgeSettings">保存知识整理设置</el-button></div>
                 </el-form>
               </el-tab-pane>
               <el-tab-pane label="模型供应商" name="providers">
