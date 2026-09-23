@@ -1,5 +1,8 @@
 package site.kael.conversationcompiler.manager.compiler;
 
+import jakarta.annotation.PreDestroy;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -10,7 +13,7 @@ import site.kael.conversationcompiler.repository.settings.KnowledgeSettingsRepos
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.Semaphore;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
@@ -22,26 +25,50 @@ public class CompileRunWorker {
     private final KnowledgeSettingsRepository settings;
     private final CompilerAgentService agent;
     private final Semaphore permits;
+    private final ExecutorService executor;
+    private final ScheduledExecutorService timeoutExecutor;
+    private final long taskTimeoutSeconds;
 
+    /** Constructor used by unit tests and synchronous callers. */
     public CompileRunWorker(CompileRunRepository runs, CompileRunExecutionRepository execution,
                             EventRepository events, KnowledgeSettingsRepository settings,
                             CompilerAgentService agent) {
-        this(runs, execution, events, settings, agent, 1);
+        this(runs, execution, events, settings, agent, 1, 600, false);
     }
 
+    @Autowired
     public CompileRunWorker(CompileRunRepository runs, CompileRunExecutionRepository execution,
                             EventRepository events, KnowledgeSettingsRepository settings,
-                            CompilerAgentService agent, int maxConcurrentRuns) {
+                            CompilerAgentService agent,
+                            @Value("${conversation-compiler.compiler.max-concurrent-runs:1}") int maxConcurrentRuns,
+                            @Value("${conversation-compiler.compiler.task-timeout-seconds:600}") long taskTimeoutSeconds) {
+        this(runs, execution, events, settings, agent, maxConcurrentRuns, taskTimeoutSeconds, true);
+    }
+
+    private CompileRunWorker(CompileRunRepository runs, CompileRunExecutionRepository execution,
+                             EventRepository events, KnowledgeSettingsRepository settings,
+                             CompilerAgentService agent, int maxConcurrentRuns,
+                             long taskTimeoutSeconds, boolean background) {
         this.runs = runs; this.execution = execution; this.events = events;
         this.settings = settings; this.agent = agent;
-        this.permits = new Semaphore(Math.max(1, maxConcurrentRuns));
+        int concurrency = Math.max(1, maxConcurrentRuns);
+        this.permits = new Semaphore(concurrency);
+        this.taskTimeoutSeconds = Math.max(1, taskTimeoutSeconds);
+        this.executor = background ? Executors.newFixedThreadPool(concurrency, daemonFactory("compiler-agent")) : null;
+        this.timeoutExecutor = background ? Executors.newScheduledThreadPool(concurrency, daemonFactory("compiler-timeout")) : null;
     }
 
     @Scheduled(fixedDelayString="${conversation-compiler.compiler.scan-interval-seconds:60}000")
     public void scan() {
-        for (Long id : runs.findPendingIds(1)) execute(id);
+        int capacity = permits.availablePermits();
+        if (capacity == 0) return;
+        for (Long id : runs.findPendingIds(capacity)) {
+            if (!permits.tryAcquire()) break;
+            submitTimed(id);
+        }
     }
 
+    /** Synchronous entry point retained for tests and manual invocations. */
     public void execute(long id) {
         if (!permits.tryAcquire()) return;
         try {
@@ -49,6 +76,24 @@ public class CompileRunWorker {
         } finally {
             permits.release();
         }
+    }
+
+    private void submitTimed(long id) {
+        FutureTask<Void> task = new FutureTask<>(() -> {
+            try {
+                executeClaimed(id);
+            } finally {
+                permits.release();
+            }
+            return null;
+        });
+        executor.execute(task);
+        timeoutExecutor.schedule(() -> {
+            if (!task.isDone()) {
+                task.cancel(true);
+                execution.markFailed(id, "compiler task timed out after " + taskTimeoutSeconds + " seconds");
+            }
+        }, taskTimeoutSeconds, TimeUnit.SECONDS);
     }
 
     private void executeClaimed(long id) {
@@ -82,7 +127,28 @@ public class CompileRunWorker {
             execution.markCompleted(id, result);
             execution.advanceCompiledVersion(run.sessionId(), run.toVersion());
         } catch (Exception e) {
-            execution.markFailed(id, e.getMessage() == null ? e.toString() : e.getMessage());
+            execution.markFailed(id, rootMessage(e));
         }
+    }
+
+    private String rootMessage(Throwable error) {
+        Throwable current = error;
+        while (current.getCause() != null) current = current.getCause();
+        return current.getMessage() == null ? current.toString() : current.getMessage();
+    }
+
+    private ThreadFactory daemonFactory(String prefix) {
+        AtomicInteger sequence = new AtomicInteger();
+        return runnable -> {
+            Thread thread = new Thread(runnable, prefix + "-" + sequence.incrementAndGet());
+            thread.setDaemon(true);
+            return thread;
+        };
+    }
+
+    @PreDestroy
+    void shutdown() {
+        if (executor != null) executor.shutdownNow();
+        if (timeoutExecutor != null) timeoutExecutor.shutdownNow();
     }
 }
