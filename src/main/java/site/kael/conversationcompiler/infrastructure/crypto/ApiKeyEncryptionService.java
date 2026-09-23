@@ -20,7 +20,7 @@ public class ApiKeyEncryptionService {
         catch (Exception e) { throw new IllegalStateException(e); }
     }
     public String encrypt(String value) {
-        if (!configured) throw new IllegalStateException("CONVERSATION_COMPILER_SECRET_KEY is required");
+        if (!configured) throw new CryptoConfigurationException("provider credential encryption is not configured");
         try {
             byte[] iv = new byte[12]; random.nextBytes(iv);
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
@@ -30,7 +30,7 @@ public class ApiKeyEncryptionService {
         } catch (Exception e) { throw new IllegalStateException("Unable to encrypt API key", e); }
     }
     public String decrypt(String value) {
-        if (!configured) throw new IllegalStateException("CONVERSATION_COMPILER_SECRET_KEY is required");
+        if (!configured) throw new CryptoConfigurationException("provider credential encryption is not configured");
         try {
             byte[] all = Base64.getDecoder().decode(value); byte[] iv = java.util.Arrays.copyOfRange(all, 0, 12); byte[] encrypted = java.util.Arrays.copyOfRange(all, 12, all.length);
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding"); cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new GCMParameterSpec(128, iv));
