@@ -33,19 +33,33 @@ public class CompilerAgentService {
         this.mapper = mapper; this.collector = collector; this.mcpProviders = mcpProviders; this.providers = providers;
     }
 
-    public CompileResultRequest compile(String requirements, String providerId, String modelName, String sessionId, long fromVersion, long toVersion, List<ConversationEvent> events) { return compile(requirements, providerId, modelName, sessionId, fromVersion, toVersion, events, new ModelFailoverRunner.AttemptObserver(){public void started(String c,int a){} public void finished(String c,int a,String s,Throwable e){}}); }
+    public CompileResultRequest compile(String requirements, String providerId, String modelName, String sessionId, long fromVersion, long toVersion, List<ConversationEvent> events) {
+        return compile(0L, requirements, providerId, modelName, sessionId, fromVersion, toVersion, events,
+                new ModelFailoverRunner.AttemptObserver() {
+                    public void started(String c, int a) { }
+                    public void finished(String c, int a, String s, Throwable e) { }
+                });
+    }
 
-    public CompileResultRequest compile(String requirements, String providerId, String modelName, String sessionId, long fromVersion, long toVersion, List<ConversationEvent> events, ModelFailoverRunner.AttemptObserver observer) {
+    public CompileResultRequest compile(String requirements, String providerId, String modelName, String sessionId,
+                                        long fromVersion, long toVersion, List<ConversationEvent> events,
+                                        ModelFailoverRunner.AttemptObserver observer) {
+        return compile(0L, requirements, providerId, modelName, sessionId, fromVersion, toVersion, events, observer);
+    }
+
+    public CompileResultRequest compile(long compileRunId, String requirements, String providerId, String modelName,
+                                        String sessionId, long fromVersion, long toVersion, List<ConversationEvent> events,
+                                        ModelFailoverRunner.AttemptObserver observer) {
         List<String> candidates = new ArrayList<>();
         candidates.add(providerId + "\n" + modelName);
         providers.findAll().stream().filter(p -> p.enabled()).flatMap(p -> p.models().stream().map(m -> p.id() + "\n" + m)).forEach(c -> { if (!candidates.contains(c)) candidates.add(c); });
         return failover.run(candidates, candidate -> {
             String[] parts = candidate.split("\n", 2);
-            return runOnce(requirements, parts[0], parts[1], sessionId, fromVersion, toVersion, events);
+            return runOnce(compileRunId, requirements, parts[0], parts[1], sessionId, fromVersion, toVersion, events);
         }, observer);
     }
 
-    private CompileResultRequest runOnce(String requirements, String providerId, String modelName, String sessionId, long fromVersion, long toVersion, List<ConversationEvent> events) {
+    private CompileResultRequest runOnce(long compileRunId, String requirements, String providerId, String modelName, String sessionId, long fromVersion, long toVersion, List<ConversationEvent> events) {
         collector.begin();
         try {
             ChatClient chatClient = chatClientFactory.create(providerId, modelName);
@@ -67,7 +81,7 @@ public class CompilerAgentService {
                     %s
                     --- END REQUIREMENTS ---
                     """.formatted(requirements == null ? "" : requirements);
-            String user = mapper.writeValueAsString(new AgentInput(sessionId, fromVersion, toVersion, events));
+            String user = mapper.writeValueAsString(new AgentInput(compileRunId, sessionId, fromVersion, toVersion, events));
             chatClient.prompt().system(system).user(user).toolCallbacks(tools).call().content();
             CompileResultRequest result = collector.get();
             if (result == null) throw new IllegalStateException("compiler agent did not call compile_result");
@@ -83,5 +97,5 @@ public class CompilerAgentService {
                 .build();
     }
 
-    private record AgentInput(String sessionId, long fromVersion, long toVersion, List<ConversationEvent> events) {}
+    private record AgentInput(long compileRunId, String sessionId, long fromVersion, long toVersion, List<ConversationEvent> events) {}
 }
