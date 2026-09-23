@@ -49,6 +49,15 @@ CREATE TABLE IF NOT EXISTS compile_runs (
     provider_id TEXT,
     model_name TEXT,
     prompt_snapshot TEXT,
+    from_event_id INTEGER,
+    to_event_id INTEGER,
+    event_count INTEGER NOT NULL DEFAULT 0,
+    trigger_type TEXT NOT NULL DEFAULT 'scheduler',
+    summary TEXT,
+    knowledge_count INTEGER NOT NULL DEFAULT 0,
+    queued_at TEXT,
+    created_at TEXT,
+    updated_at TEXT,
     compiler_version TEXT NOT NULL DEFAULT 'mvp'
 );
 
@@ -90,6 +99,18 @@ CREATE TABLE IF NOT EXISTS knowledge_compile_settings (
     updated_at TEXT NOT NULL,
     FOREIGN KEY (provider_id) REFERENCES model_providers(id) ON DELETE SET NULL
 );
+
+CREATE TABLE IF NOT EXISTS knowledge_compile_setting_models (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    setting_id INTEGER NOT NULL DEFAULT 1,
+    provider_id TEXT NOT NULL,
+    model_name TEXT NOT NULL,
+    selection_order INTEGER NOT NULL,
+    FOREIGN KEY (setting_id) REFERENCES knowledge_compile_settings(id) ON DELETE CASCADE,
+    FOREIGN KEY (provider_id) REFERENCES model_providers(id) ON DELETE CASCADE,
+    UNIQUE(setting_id, provider_id, model_name)
+);
+CREATE INDEX IF NOT EXISTS idx_knowledge_compile_setting_models_order ON knowledge_compile_setting_models(setting_id, selection_order);
 
 CREATE TABLE IF NOT EXISTS compile_run_knowledge_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

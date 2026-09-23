@@ -44,11 +44,23 @@ pnpm build:standalone
 
 ## 后端运行
 
+模型供应商的 API Key 会使用 AES-GCM 加密保存，因此启动后端时必须配置加密密钥。该密钥不要提交到 Git，也不要与模型 API Key 混用。
+
+本地开发可以使用一个仅保存在本机环境中的随机值：
+
 ```bash
+export CONVERSATION_COMPILER_SECRET_KEY="$(openssl rand -hex 32)"
 mvn spring-boot:run
+```
+
+生产环境必须使用稳定且安全保存的密钥；更换该密钥后，已保存的模型供应商 API Key 将无法解密。
+
+如果没有配置该密钥，服务仍可启动并浏览会话，但保存模型供应商时会返回 `503`，而不是 `500`。
+
+```bash
 # 或先构建再运行
-mvn clean package
-java -jar target/conversation-compiler-0.0.1-SNAPSHOT.jar
+CONVERSATION_COMPILER_SECRET_KEY="<secret>" mvn clean package
+CONVERSATION_COMPILER_SECRET_KEY="<secret>" java -jar target/conversation-compiler-0.0.1-SNAPSHOT.jar
 ```
 
 SQLite 数据库默认保存到：

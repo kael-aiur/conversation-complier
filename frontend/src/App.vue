@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import {
   ChatDotRound,
   Clock,
@@ -42,8 +43,11 @@ const fetchingProviderModels = ref(false)
 const providerModelsFetched = ref(false)
 const selectedProviderId = ref('provider-openai')
 const selectedModel = ref('gpt-4o-mini')
+const selectedModels = ref([])
 const compileInterval = ref(30)
 const compilePrompt = ref('提取稳定事实、已确认的项目决策、用户明确表达的偏好和可复用流程。忽略普通问答、临时调试、助手推测和敏感凭据。')
+const knowledgeSettingsEditing = ref(false)
+const savingKnowledgeSettings = ref(false)
 const providerForm = ref(createProviderForm())
 const compileSessionFilter = ref('')
 
@@ -76,6 +80,20 @@ const filteredCompileRuns = computed(() => compileSessionFilter.value
   : compileRuns.value)
 const selectedProvider = computed(() => providers.value.find((provider) => provider.id === selectedProviderId.value))
 const providerModels = computed(() => selectedProvider.value?.models || [])
+const modelOptions = computed(() => providers.value.flatMap((provider) => provider.models.map((model) => ({
+  key: `${provider.id}::${model}`,
+  providerId: provider.id,
+  providerName: provider.name,
+  modelName: model,
+  label: `${provider.name} / ${model}`,
+}))))
+const selectedModelKeys = computed({
+  get: () => selectedModels.value.map((model) => `${model.providerId}::${model.modelName}`),
+  set: (keys) => {
+    selectedModels.value = keys.map((key) => modelOptions.value.find((option) => option.key === key)).filter(Boolean)
+      .map((option) => ({ providerId: option.providerId, providerName: option.providerName, modelName: option.modelName }))
+  },
+})
 
 async function checkApi() {
   checking.value = true
@@ -139,7 +157,10 @@ async function loadProviders() {
     if (!selectedProviderId.value || !providers.value.some((p) => p.id === selectedProviderId.value)) {
       selectedProviderId.value = providers.value[0]?.id || ''
     }
-    selectedModel.value = selectedProvider.value?.models?.[0] || ''
+    if (selectedModels.value.length === 0) {
+      const first = modelOptions.value[0]
+      if (first) selectedModels.value = [{ providerId: first.providerId, providerName: first.providerName, modelName: first.modelName }]
+    }
   } catch (error) {
     apiError.value = `模型供应商加载失败：${error.message}`
   }
@@ -151,10 +172,16 @@ async function loadKnowledgeSettings() {
     if (response.status === 204) return
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     const data = await response.json()
-    selectedProviderId.value = data.providerId || selectedProviderId.value
-    selectedModel.value = data.modelName || selectedModel.value
+    if (Array.isArray(data.models) && data.models.length) {
+      selectedModels.value = data.models.map((model) => ({ providerId: model.providerId, providerName: model.providerName, modelName: model.modelName }))
+    } else if (data.providerId && data.modelName) {
+      selectedModels.value = [{ providerId: data.providerId, providerName: data.providerName, modelName: data.modelName }]
+    }
+    selectedProviderId.value = selectedModels.value[0]?.providerId || data.providerId || selectedProviderId.value
+    selectedModel.value = selectedModels.value[0]?.modelName || data.modelName || selectedModel.value
     compileInterval.value = data.intervalMinutes || 30
     compilePrompt.value = data.prompt || ''
+    knowledgeSettingsEditing.value = false
   } catch (error) {
     apiError.value = `知识整理设置加载失败：${error.message}`
   }
@@ -299,8 +326,9 @@ function openProviderEdit(provider) {
 }
 
 async function fetchProviderModels() {
-  if (!providerForm.value.baseUrl.trim() || !providerForm.value.type || !providerForm.value.apiKey.trim()) {
-    providerDrawerError.value = '请填写接口类型、Base URL 和 API Key 后获取模型'
+  if (!providerForm.value.baseUrl.trim() || !providerForm.value.type
+      || (providerDrawerMode.value === 'create' && !providerForm.value.apiKey.trim())) {
+    providerDrawerError.value = '请填写接口类型、Base URL 和 API Key 后获取模型；修改已有供应商时可使用已保存的 API Key'
     return
   }
   fetchingProviderModels.value = true
@@ -308,9 +336,18 @@ async function fetchProviderModels() {
   try {
     const response = await fetch('/api/v1/model-providers/fetch-models', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ interfaceType: providerForm.value.type, baseUrl: providerForm.value.baseUrl, apiKey: providerForm.value.apiKey }),
+      body: JSON.stringify({
+        interfaceType: providerForm.value.type,
+        baseUrl: providerForm.value.baseUrl,
+        apiKey: providerForm.value.apiKey,
+        providerId: providerDrawerMode.value === 'edit' ? providerForm.value.id : null,
+      }),
     })
-    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    if (!response.ok) {
+      let detail = `HTTP ${response.status}`
+      try { detail = (await response.json()).message || detail } catch { /* keep HTTP status */ }
+      throw new Error(detail)
+    }
     const data = await response.json()
     providerForm.value.models = data.models || []
     providerForm.value.modelsFetchedAt = data.fetchedAt || '刚刚'
@@ -344,16 +381,49 @@ async function deleteProvider(provider) {
   } catch (error) { apiError.value = `删除供应商失败：${error.message}` }
 }
 
-async function saveKnowledgeSettings() {
-  try {
-    const response = await fetch('/api/v1/settings/knowledge', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ providerId: selectedProviderId.value, modelName: selectedModel.value, intervalMinutes: compileInterval.value, prompt: compilePrompt.value, enabled: true }) })
-    if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    apiError.value = ''
-  } catch (error) { apiError.value = `知识整理设置保存失败：${error.message}` }
+function startKnowledgeSettingsEditing() {
+  knowledgeSettingsEditing.value = true
+  apiError.value = ''
 }
 
-function handleProviderChange(providerId) {
-  selectedModel.value = providers.value.find((provider) => provider.id === providerId)?.models[0] || ''
+async function cancelKnowledgeSettingsEditing() {
+  knowledgeSettingsEditing.value = false
+  await loadKnowledgeSettings()
+}
+
+async function saveKnowledgeSettings() {
+  savingKnowledgeSettings.value = true
+  try {
+    const response = await fetch('/api/v1/settings/knowledge', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+      models: selectedModels.value.map(({ providerId, modelName }) => ({ providerId, modelName })),
+      providerId: selectedModels.value[0]?.providerId || selectedProviderId.value,
+      modelName: selectedModels.value[0]?.modelName || selectedModel.value,
+      intervalMinutes: compileInterval.value,
+      prompt: compilePrompt.value,
+      enabled: true,
+    }) })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    apiError.value = ''
+    knowledgeSettingsEditing.value = false
+    ElMessage({ message: '知识整理设置保存成功', type: 'success', duration: 2200, showClose: true })
+  } catch (error) {
+    apiError.value = `知识整理设置保存失败：${error.message}`
+    ElMessage({ message: `保存失败：${error.message}`, type: 'error', duration: 3200, showClose: true })
+  } finally {
+    savingKnowledgeSettings.value = false
+  }
+}
+
+function moveSelectedModel(index, offset) {
+  const target = index + offset
+  if (target < 0 || target >= selectedModels.value.length) return
+  const next = [...selectedModels.value]
+  ;[next[index], next[target]] = [next[target], next[index]]
+  selectedModels.value = next
+}
+
+function removeSelectedModel(index) {
+  selectedModels.value = selectedModels.value.filter((_, currentIndex) => currentIndex !== index)
 }
 
 async function openCompileRun(run) {
@@ -496,28 +566,45 @@ function eventIcon(type) {
           <el-card shadow="never" class="settings-card">
             <el-tabs v-model="settingsTab" class="settings-tabs">
               <el-tab-pane label="知识整理" name="knowledge">
-                <el-form label-position="top" class="settings-form">
+                <div class="settings-tab-header">
+                  <div>
+                    <strong>知识整理规则</strong>
+                    <span>{{ knowledgeSettingsEditing ? '编辑模式：修改后点击保存' : '当前为只读状态' }}</span>
+                  </div>
+                  <div class="settings-tab-actions">
+                    <el-button v-if="!knowledgeSettingsEditing" type="primary" plain @click="startKnowledgeSettingsEditing"><el-icon><Edit /></el-icon>编辑</el-button>
+                    <template v-else>
+                      <el-button @click="cancelKnowledgeSettingsEditing">取消</el-button>
+                      <el-button type="primary" :loading="savingKnowledgeSettings" @click="saveKnowledgeSettings">保存设置</el-button>
+                    </template>
+                  </div>
+                </div>
+                <el-form label-position="top" class="settings-form" :class="{ 'settings-form--readonly': !knowledgeSettingsEditing }">
                   <el-form-item label="模型选择">
-                    <div class="cascading-model-select">
-                      <el-select v-model="selectedProviderId" class="provider-select" placeholder="选择供应商" @change="handleProviderChange">
-                        <el-option v-for="provider in providers" :key="provider.id" :label="provider.name" :value="provider.id" />
-                      </el-select>
-                      <span class="select-arrow">/</span>
-                      <el-select v-model="selectedModel" class="model-select" popper-class="model-select-popper" placeholder="选择模型" :disabled="!selectedProvider">
-                        <el-option v-for="model in providerModels" :key="model" :label="model" :value="model" />
-                      </el-select>
+                    <el-select v-model="selectedModelKeys" class="multi-model-select" popper-class="model-select-popper" multiple filterable collapse-tags :max-collapse-tags="2" placeholder="按顺序选择备用模型" :disabled="!knowledgeSettingsEditing">
+                      <el-option v-for="option in modelOptions" :key="option.key" :label="option.label" :value="option.key" />
+                    </el-select>
+                    <div v-if="selectedModels.length" class="selected-model-order">
+                      <div v-for="(model, index) in selectedModels" :key="`${model.providerId}::${model.modelName}`" class="selected-model-row">
+                        <span class="selected-model-index">{{ index + 1 }}</span>
+                        <span class="selected-model-name">{{ model.providerName }} / {{ model.modelName }}</span>
+                        <template v-if="knowledgeSettingsEditing">
+                          <el-button text size="small" :disabled="index === 0" @click="moveSelectedModel(index, -1)">上移</el-button>
+                          <el-button text size="small" :disabled="index === selectedModels.length - 1" @click="moveSelectedModel(index, 1)">下移</el-button>
+                          <el-button text type="danger" size="small" @click="removeSelectedModel(index)">移除</el-button>
+                        </template>
+                      </div>
                     </div>
-                    <span class="form-help">先选择供应商，再选择该供应商已获取的模型。</span>
+                    <span class="form-help">按列表顺序逐个尝试模型；某个模型成功后停止，全部失败后任务失败。</span>
                   </el-form-item>
                   <el-form-item label="整理间隔">
-                    <div class="interval-input"><el-input-number v-model="compileInterval" :min="1" :step="1" controls-position="right" /><span>分钟</span></div>
+                    <div class="interval-input"><el-input-number v-model="compileInterval" :min="1" :step="1" controls-position="right" :disabled="!knowledgeSettingsEditing" /><span>分钟</span></div>
                     <span class="form-help">会话超过该空闲时间后，进入待整理队列。</span>
                   </el-form-item>
                   <el-form-item label="整理要求">
-                    <el-input v-model="compilePrompt" type="textarea" :rows="8" placeholder="输入知识整理 Prompt" />
+                    <el-input v-model="compilePrompt" type="textarea" :rows="8" placeholder="输入知识整理 Prompt" :disabled="!knowledgeSettingsEditing" />
                     <span class="form-help">这些要求会作为编译器的基础提示词。</span>
                   </el-form-item>
-                  <div class="settings-actions"><el-button type="primary" @click="saveKnowledgeSettings">保存知识整理设置</el-button></div>
                 </el-form>
               </el-tab-pane>
               <el-tab-pane label="模型供应商" name="providers">

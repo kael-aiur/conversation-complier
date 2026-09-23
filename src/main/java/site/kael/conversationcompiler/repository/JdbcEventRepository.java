@@ -17,6 +17,16 @@ public class JdbcEventRepository implements EventRepository {
     }
 
     @Override
+    public List<ConversationEvent> findBySessionIdAndVersionRange(String sessionId, long fromVersion, long toVersion) {
+        if (toVersion < fromVersion) return List.of();
+        long count = toVersion - fromVersion + 1;
+        if (count > Integer.MAX_VALUE || fromVersion < 1 || fromVersion > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("event version range is outside supported bounds");
+        }
+        return findBySessionId(sessionId, (int) count, (int) (fromVersion - 1));
+    }
+
+    @Override
     public List<ConversationEvent> findBySessionId(String sessionId, int limit, int offset) {
         return jdbc.query("SELECT id,session_id,event_id,event_type,event_timestamp,received_at,payload_json FROM conversation_events WHERE session_id=? ORDER BY id ASC LIMIT ? OFFSET ?", (rs, rowNum) -> new ConversationEvent(rs.getLong("id"), rs.getString("session_id"), rs.getString("event_id"), rs.getString("event_type"), rs.getDouble("event_timestamp"), rs.getString("received_at"), rs.getString("payload_json")), sessionId, limit, offset);
     }

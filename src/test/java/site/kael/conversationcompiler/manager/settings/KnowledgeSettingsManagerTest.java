@@ -4,4 +4,13 @@ import static org.assertj.core.api.Assertions.*; import static org.mockito.Mocki
 class KnowledgeSettingsManagerTest {
  @Test void savesValidSettings(){var s=mock(KnowledgeSettingsRepository.class);var p=mock(ModelProviderRepository.class);var provider=new ModelProvider("p","OpenAI",InterfaceType.responses,"url",true,"••••abcd",List.of("gpt"),"now",true,""," ");when(p.exists("p")).thenReturn(true);when(p.findById("p")).thenReturn(Optional.of(provider));when(p.findModels("p")).thenReturn(List.of("gpt"));new KnowledgeSettingsManager(s,p).save(new KnowledgeSettingsRequest("p","gpt",30,"prompt",true));verify(s).save("p","gpt",30,"prompt",true);}
  @Test void rejectsUnavailableModel(){var s=mock(KnowledgeSettingsRepository.class);var p=mock(ModelProviderRepository.class);when(p.exists("p")).thenReturn(true);when(p.findById("p")).thenReturn(Optional.of(new ModelProvider("p","P",InterfaceType.responses,"u",true,"x",List.of(),"",true,"","")));when(p.findModels("p")).thenReturn(List.of());assertThatThrownBy(()->new KnowledgeSettingsManager(s,p).save(new KnowledgeSettingsRequest("p","bad",1,"",true))).isInstanceOf(RuntimeException.class);}
+
+ @Test void savesModelsInConfiguredOrder(){
+  var s=mock(KnowledgeSettingsRepository.class); var p=mock(ModelProviderRepository.class);
+  var provider=new ModelProvider("p","OpenAI",InterfaceType.responses,"url",true,"••••abcd",List.of("first","second"),"now",true,"","");
+  when(p.exists("p")).thenReturn(true); when(p.findById("p")).thenReturn(Optional.of(provider)); when(p.findModels("p")).thenReturn(List.of("first","second"));
+  var request=new KnowledgeSettingsRequest("p","first",List.of(new KnowledgeModelSelectionRequest("p","second"),new KnowledgeModelSelectionRequest("p","first")),30,"prompt",true);
+  new KnowledgeSettingsManager(s,p).save(request);
+  verify(s).save(request.models(),30,"prompt",true);
+ }
 }
