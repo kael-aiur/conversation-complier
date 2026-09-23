@@ -142,7 +142,13 @@ async function loadProviders() {
     if (!selectedProviderId.value || !providers.value.some((p) => p.id === selectedProviderId.value)) {
       selectedProviderId.value = providers.value[0]?.id || ''
     }
-    selectedModel.value = selectedProvider.value?.models?.[0] || ''
+    // Startup loads providers and persisted knowledge settings in parallel. Keep
+    // the persisted model when it is still available instead of overwriting it
+    // with the first model returned by the provider list.
+    const availableModels = selectedProvider.value?.models || []
+    if (!selectedModel.value || !availableModels.includes(selectedModel.value)) {
+      selectedModel.value = availableModels[0] || ''
+    }
   } catch (error) {
     apiError.value = `模型供应商加载失败：${error.message}`
   }
