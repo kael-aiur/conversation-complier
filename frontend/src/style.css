@@ -213,3 +213,10 @@ h1 { margin: 0; color: #172033; font-size: 28px; line-height: 1.2; }
 .settings-form--readonly .el-textarea.is-disabled .el-textarea__inner,
 .settings-form--readonly .el-input-number.is-disabled .el-input__inner,
 .settings-form--readonly .el-select .el-select__selected-item { color: var(--text-primary); -webkit-text-fill-color: var(--text-primary); }
+
+.multi-model-select { width: 100%; }
+.selected-model-order { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; max-width: 880px; }
+.selected-model-row { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 5px 9px; border: 1px solid var(--border-color); border-radius: 7px; background: #f8fafc; }
+.selected-model-index { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #e8eefc; color: #4666b0; font-size: 12px; font-weight: 700; }
+.selected-model-name { flex: 1; min-width: 0; overflow: hidden; color: var(--text-primary); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.settings-form--readonly .selected-model-row { background: #fff; }

@@ -100,6 +100,18 @@ CREATE TABLE IF NOT EXISTS knowledge_compile_settings (
     FOREIGN KEY (provider_id) REFERENCES model_providers(id) ON DELETE SET NULL
 );
 
+CREATE TABLE IF NOT EXISTS knowledge_compile_setting_models (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    setting_id INTEGER NOT NULL DEFAULT 1,
+    provider_id TEXT NOT NULL,
+    model_name TEXT NOT NULL,
+    selection_order INTEGER NOT NULL,
+    FOREIGN KEY (setting_id) REFERENCES knowledge_compile_settings(id) ON DELETE CASCADE,
+    FOREIGN KEY (provider_id) REFERENCES model_providers(id) ON DELETE CASCADE,
+    UNIQUE(setting_id, provider_id, model_name)
+);
+CREATE INDEX IF NOT EXISTS idx_knowledge_compile_setting_models_order ON knowledge_compile_setting_models(setting_id, selection_order);
+
 CREATE TABLE IF NOT EXISTS compile_run_knowledge_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     compile_run_id INTEGER NOT NULL,

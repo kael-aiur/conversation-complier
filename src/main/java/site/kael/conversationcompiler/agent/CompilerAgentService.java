@@ -11,6 +11,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import site.kael.conversationcompiler.domain.ConversationEvent;
+import site.kael.conversationcompiler.domain.settings.KnowledgeModelSelection;
 import site.kael.conversationcompiler.repository.settings.ModelProviderRepository;
 
 import java.util.ArrayList;
@@ -50,9 +51,14 @@ public class CompilerAgentService {
     public CompileResultRequest compile(long compileRunId, String requirements, String providerId, String modelName,
                                         String sessionId, long fromVersion, long toVersion, List<ConversationEvent> events,
                                         ModelFailoverRunner.AttemptObserver observer) {
-        List<String> candidates = new ArrayList<>();
-        candidates.add(providerId + "\n" + modelName);
-        providers.findAll().stream().filter(p -> p.enabled()).flatMap(p -> p.models().stream().map(m -> p.id() + "\n" + m)).forEach(c -> { if (!candidates.contains(c)) candidates.add(c); });
+        return compile(compileRunId, requirements, List.of(new KnowledgeModelSelection(providerId, null, modelName)),
+                sessionId, fromVersion, toVersion, events, observer);
+    }
+
+    public CompileResultRequest compile(long compileRunId, String requirements, List<KnowledgeModelSelection> selections,
+                                        String sessionId, long fromVersion, long toVersion, List<ConversationEvent> events,
+                                        ModelFailoverRunner.AttemptObserver observer) {
+        List<String> candidates = selections.stream().map(selection -> selection.providerId() + "\n" + selection.modelName()).distinct().toList();
         return failover.run(candidates, candidate -> {
             String[] parts = candidate.split("\n", 2);
             return runOnce(compileRunId, requirements, parts[0], parts[1], sessionId, fromVersion, toVersion, events);

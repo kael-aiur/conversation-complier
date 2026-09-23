@@ -129,7 +129,10 @@ public class CompileRunWorker {
                             error == null ? null : error.getMessage());
                 }
             };
-            var result = agent.compile(run.id(), setting.prompt(), setting.providerId(), setting.modelName(),
+            var result = setting.models().size() == 1
+                    ? agent.compile(run.id(), setting.prompt(), setting.models().get(0).providerId(), setting.models().get(0).modelName(),
+                    run.sessionId(), run.fromVersion(), run.toVersion(), list, observer)
+                    : agent.compile(run.id(), setting.prompt(), setting.models(),
                     run.sessionId(), run.fromVersion(), run.toVersion(), list, observer);
             execution.updatePhase(id, "saving_result", 90);
             execution.insertKnowledgeItems(id, result);

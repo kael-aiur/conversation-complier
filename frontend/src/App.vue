@@ -43,6 +43,7 @@ const fetchingProviderModels = ref(false)
 const providerModelsFetched = ref(false)
 const selectedProviderId = ref('provider-openai')
 const selectedModel = ref('gpt-4o-mini')
+const selectedModels = ref([])
 const compileInterval = ref(30)
 const compilePrompt = ref('提取稳定事实、已确认的项目决策、用户明确表达的偏好和可复用流程。忽略普通问答、临时调试、助手推测和敏感凭据。')
 const knowledgeSettingsEditing = ref(false)
@@ -79,6 +80,20 @@ const filteredCompileRuns = computed(() => compileSessionFilter.value
   : compileRuns.value)
 const selectedProvider = computed(() => providers.value.find((provider) => provider.id === selectedProviderId.value))
 const providerModels = computed(() => selectedProvider.value?.models || [])
+const modelOptions = computed(() => providers.value.flatMap((provider) => provider.models.map((model) => ({
+  key: `${provider.id}::${model}`,
+  providerId: provider.id,
+  providerName: provider.name,
+  modelName: model,
+  label: `${provider.name} / ${model}`,
+}))))
+const selectedModelKeys = computed({
+  get: () => selectedModels.value.map((model) => `${model.providerId}::${model.modelName}`),
+  set: (keys) => {
+    selectedModels.value = keys.map((key) => modelOptions.value.find((option) => option.key === key)).filter(Boolean)
+      .map((option) => ({ providerId: option.providerId, providerName: option.providerName, modelName: option.modelName }))
+  },
+})
 
 async function checkApi() {
   checking.value = true
@@ -142,12 +157,9 @@ async function loadProviders() {
     if (!selectedProviderId.value || !providers.value.some((p) => p.id === selectedProviderId.value)) {
       selectedProviderId.value = providers.value[0]?.id || ''
     }
-    // Startup loads providers and persisted knowledge settings in parallel. Keep
-    // the persisted model when it is still available instead of overwriting it
-    // with the first model returned by the provider list.
-    const availableModels = selectedProvider.value?.models || []
-    if (!selectedModel.value || !availableModels.includes(selectedModel.value)) {
-      selectedModel.value = availableModels[0] || ''
+    if (selectedModels.value.length === 0) {
+      const first = modelOptions.value[0]
+      if (first) selectedModels.value = [{ providerId: first.providerId, providerName: first.providerName, modelName: first.modelName }]
     }
   } catch (error) {
     apiError.value = `模型供应商加载失败：${error.message}`
@@ -160,8 +172,13 @@ async function loadKnowledgeSettings() {
     if (response.status === 204) return
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     const data = await response.json()
-    selectedProviderId.value = data.providerId || selectedProviderId.value
-    selectedModel.value = data.modelName || selectedModel.value
+    if (Array.isArray(data.models) && data.models.length) {
+      selectedModels.value = data.models.map((model) => ({ providerId: model.providerId, providerName: model.providerName, modelName: model.modelName }))
+    } else if (data.providerId && data.modelName) {
+      selectedModels.value = [{ providerId: data.providerId, providerName: data.providerName, modelName: data.modelName }]
+    }
+    selectedProviderId.value = selectedModels.value[0]?.providerId || data.providerId || selectedProviderId.value
+    selectedModel.value = selectedModels.value[0]?.modelName || data.modelName || selectedModel.value
     compileInterval.value = data.intervalMinutes || 30
     compilePrompt.value = data.prompt || ''
     knowledgeSettingsEditing.value = false
@@ -367,7 +384,14 @@ async function cancelKnowledgeSettingsEditing() {
 async function saveKnowledgeSettings() {
   savingKnowledgeSettings.value = true
   try {
-    const response = await fetch('/api/v1/settings/knowledge', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ providerId: selectedProviderId.value, modelName: selectedModel.value, intervalMinutes: compileInterval.value, prompt: compilePrompt.value, enabled: true }) })
+    const response = await fetch('/api/v1/settings/knowledge', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+      models: selectedModels.value.map(({ providerId, modelName }) => ({ providerId, modelName })),
+      providerId: selectedModels.value[0]?.providerId || selectedProviderId.value,
+      modelName: selectedModels.value[0]?.modelName || selectedModel.value,
+      intervalMinutes: compileInterval.value,
+      prompt: compilePrompt.value,
+      enabled: true,
+    }) })
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     apiError.value = ''
     knowledgeSettingsEditing.value = false
@@ -380,8 +404,16 @@ async function saveKnowledgeSettings() {
   }
 }
 
-function handleProviderChange(providerId) {
-  selectedModel.value = providers.value.find((provider) => provider.id === providerId)?.models[0] || ''
+function moveSelectedModel(index, offset) {
+  const target = index + offset
+  if (target < 0 || target >= selectedModels.value.length) return
+  const next = [...selectedModels.value]
+  ;[next[index], next[target]] = [next[target], next[index]]
+  selectedModels.value = next
+}
+
+function removeSelectedModel(index) {
+  selectedModels.value = selectedModels.value.filter((_, currentIndex) => currentIndex !== index)
 }
 
 async function openCompileRun(run) {
@@ -539,16 +571,21 @@ function eventIcon(type) {
                 </div>
                 <el-form label-position="top" class="settings-form" :class="{ 'settings-form--readonly': !knowledgeSettingsEditing }">
                   <el-form-item label="模型选择">
-                    <div class="cascading-model-select">
-                      <el-select v-model="selectedProviderId" class="provider-select" placeholder="选择供应商" :disabled="!knowledgeSettingsEditing" @change="handleProviderChange">
-                        <el-option v-for="provider in providers" :key="provider.id" :label="provider.name" :value="provider.id" />
-                      </el-select>
-                      <span class="select-arrow">/</span>
-                      <el-select v-model="selectedModel" class="model-select" popper-class="model-select-popper" placeholder="选择模型" :disabled="!knowledgeSettingsEditing || !selectedProvider">
-                        <el-option v-for="model in providerModels" :key="model" :label="model" :value="model" />
-                      </el-select>
+                    <el-select v-model="selectedModelKeys" class="multi-model-select" popper-class="model-select-popper" multiple filterable collapse-tags :max-collapse-tags="2" placeholder="按顺序选择备用模型" :disabled="!knowledgeSettingsEditing">
+                      <el-option v-for="option in modelOptions" :key="option.key" :label="option.label" :value="option.key" />
+                    </el-select>
+                    <div v-if="selectedModels.length" class="selected-model-order">
+                      <div v-for="(model, index) in selectedModels" :key="`${model.providerId}::${model.modelName}`" class="selected-model-row">
+                        <span class="selected-model-index">{{ index + 1 }}</span>
+                        <span class="selected-model-name">{{ model.providerName }} / {{ model.modelName }}</span>
+                        <template v-if="knowledgeSettingsEditing">
+                          <el-button text size="small" :disabled="index === 0" @click="moveSelectedModel(index, -1)">上移</el-button>
+                          <el-button text size="small" :disabled="index === selectedModels.length - 1" @click="moveSelectedModel(index, 1)">下移</el-button>
+                          <el-button text type="danger" size="small" @click="removeSelectedModel(index)">移除</el-button>
+                        </template>
+                      </div>
                     </div>
-                    <span class="form-help">先选择供应商，再选择该供应商已获取的模型。</span>
+                    <span class="form-help">按列表顺序逐个尝试模型；某个模型成功后停止，全部失败后任务失败。</span>
                   </el-form-item>
                   <el-form-item label="整理间隔">
                     <div class="interval-input"><el-input-number v-model="compileInterval" :min="1" :step="1" controls-position="right" :disabled="!knowledgeSettingsEditing" /><span>分钟</span></div>

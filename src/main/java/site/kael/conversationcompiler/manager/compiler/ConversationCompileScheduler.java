@@ -18,7 +18,7 @@ public class ConversationCompileScheduler {
     @Scheduled(fixedDelayString="${conversation-compiler.compiler.scan-interval-seconds:60}000")
     public void scanIdleConversations() {
         var config=settings.find().orElse(null);
-        if (config == null || !config.enabled() || config.intervalMinutes() < 1 || config.providerId() == null || config.modelName() == null) return;
+        if (config == null || !config.enabled() || config.intervalMinutes() < 1 || config.models().isEmpty()) return;
         double cutoff = System.currentTimeMillis() / 1000.0 - config.intervalMinutes() * 60.0;
         conversations.findIdleCandidates(cutoff, 20).forEach(conversation -> {
             if (!runs.hasActiveRun(conversation.sessionId()) && !runs.hasFailedRunAtVersion(conversation.sessionId(), conversation.version())) {
