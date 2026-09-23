@@ -5,7 +5,7 @@ public interface CompileRunExecutionRepository {
  void finishAttempt(long attemptId, String status, String errorType, String errorMessage);
  boolean markRunning(long id, String phase, String providerId, String modelName, String prompt);
  void updatePhase(long id, String phase, int progress);
- void markCompleted(long id, CompileResultRequest result);
+ boolean markCompleted(long id, CompileResultRequest result);
  void markFailed(long id, String error);
  void insertKnowledgeItems(long runId, CompileResultRequest result);
  void advanceCompiledVersion(String sessionId, long version);

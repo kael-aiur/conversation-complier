@@ -124,7 +124,7 @@ public class CompileRunWorker {
                     run.sessionId(), run.fromVersion(), run.toVersion(), list, observer);
             execution.updatePhase(id, "saving_result", 90);
             execution.insertKnowledgeItems(id, result);
-            execution.markCompleted(id, result);
+            if (!execution.markCompleted(id, result)) return;
             execution.advanceCompiledVersion(run.sessionId(), run.toVersion());
         } catch (Exception e) {
             execution.markFailed(id, rootMessage(e));
