@@ -64,13 +64,22 @@ public class CompileRunWorker {
         if (capacity == 0) return;
         for (Long id : runs.findPendingIds(capacity)) {
             if (!permits.tryAcquire()) break;
-            submitTimed(id);
+            if (executor == null) executeClaimedWithPermit(id);
+            else submitTimed(id);
         }
     }
 
     /** Synchronous entry point retained for tests and manual invocations. */
     public void execute(long id) {
         if (!permits.tryAcquire()) return;
+        try {
+            executeClaimed(id);
+        } finally {
+            permits.release();
+        }
+    }
+
+    private void executeClaimedWithPermit(long id) {
         try {
             executeClaimed(id);
         } finally {
