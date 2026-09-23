@@ -1,2 +1,6 @@
 package site.kael.conversationcompiler.domain.settings;
-public record FetchModelsRequest(String interfaceType, String baseUrl, String apiKey) {}
+public record FetchModelsRequest(String interfaceType, String baseUrl, String apiKey, String providerId) {
+    public FetchModelsRequest(String interfaceType, String baseUrl, String apiKey) {
+        this(interfaceType, baseUrl, apiKey, null);
+    }
+}

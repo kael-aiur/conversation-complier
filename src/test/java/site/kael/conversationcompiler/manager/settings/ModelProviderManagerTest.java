@@ -4,4 +4,12 @@ import static org.assertj.core.api.Assertions.*; import static org.mockito.Mocki
 class ModelProviderManagerTest {
  @Test void fetchesModelsThroughProviderClient(){var p=mock(ModelProviderRepository.class);var s=mock(KnowledgeSettingsRepository.class);var c=mock(ProviderModelClient.class);when(c.fetchModels(InterfaceType.responses,"https://x","key")).thenReturn(List.of("m"));assertThat(new ModelProviderManager(p,s,new ApiKeyEncryptionService("secret"),c).fetch(new FetchModelsRequest("responses","https://x","key"))).containsExactly("m");}
  @Test void refusesSaveWithoutFetchedModels(){var m=new ModelProviderManager(mock(ModelProviderRepository.class),mock(KnowledgeSettingsRepository.class),new ApiKeyEncryptionService("secret"),mock(ProviderModelClient.class));assertThatThrownBy(()->m.save(null,new ModelProviderRequest("P","responses","url","key",List.of(),null,true))).isInstanceOf(RuntimeException.class);}
+
+ @Test void fetchesModelsUsingSavedKeyWhenEditingProvider(){
+  var p=mock(ModelProviderRepository.class); var s=mock(KnowledgeSettingsRepository.class); var c=mock(ProviderModelClient.class);
+  var crypto=new ApiKeyEncryptionService("secret");
+  when(p.exists("provider-1")).thenReturn(true); when(p.findEncryptedApiKey("provider-1")).thenReturn(crypto.encrypt("saved-key"));
+  when(c.fetchModels(InterfaceType.responses,"https://x","saved-key")).thenReturn(List.of("m"));
+  assertThat(new ModelProviderManager(p,s,crypto,c).fetch(new FetchModelsRequest("responses","https://x","","provider-1"))).containsExactly("m");
+ }
 }

@@ -326,8 +326,9 @@ function openProviderEdit(provider) {
 }
 
 async function fetchProviderModels() {
-  if (!providerForm.value.baseUrl.trim() || !providerForm.value.type || !providerForm.value.apiKey.trim()) {
-    providerDrawerError.value = '请填写接口类型、Base URL 和 API Key 后获取模型'
+  if (!providerForm.value.baseUrl.trim() || !providerForm.value.type
+      || (providerDrawerMode.value === 'create' && !providerForm.value.apiKey.trim())) {
+    providerDrawerError.value = '请填写接口类型、Base URL 和 API Key 后获取模型；修改已有供应商时可使用已保存的 API Key'
     return
   }
   fetchingProviderModels.value = true
@@ -335,9 +336,18 @@ async function fetchProviderModels() {
   try {
     const response = await fetch('/api/v1/model-providers/fetch-models', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ interfaceType: providerForm.value.type, baseUrl: providerForm.value.baseUrl, apiKey: providerForm.value.apiKey }),
+      body: JSON.stringify({
+        interfaceType: providerForm.value.type,
+        baseUrl: providerForm.value.baseUrl,
+        apiKey: providerForm.value.apiKey,
+        providerId: providerDrawerMode.value === 'edit' ? providerForm.value.id : null,
+      }),
     })
-    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    if (!response.ok) {
+      let detail = `HTTP ${response.status}`
+      try { detail = (await response.json()).message || detail } catch { /* keep HTTP status */ }
+      throw new Error(detail)
+    }
     const data = await response.json()
     providerForm.value.models = data.models || []
     providerForm.value.modelsFetchedAt = data.fetchedAt || '刚刚'
