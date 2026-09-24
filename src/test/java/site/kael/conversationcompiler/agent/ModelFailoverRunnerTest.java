@@ -37,9 +37,24 @@ class ModelFailoverRunnerTest {
         assertThat(calls).hasValue(2);
     }
 
-    @Test void doesNotFailOverOnBadRequest() {
-        assertThatThrownBy(() -> runner().run(List.of("a", "b"), m -> { throw new RuntimeException("HTTP 400"); }))
-                .hasMessageContaining("HTTP 400");
+    @Test void skipsBadRequestingModelAndTriesNextConfiguredModel() {
+        var calls = new java.util.ArrayList<String>();
+        String result = runner().run(List.of("bad-request-model", "fallback-model"), model -> {
+            calls.add(model);
+            if (model.equals("bad-request-model")) throw new RuntimeException("400: * GenerateContentRequest.contents: contents is not specified");
+            return model;
+        });
+        assertThat(result).isEqualTo("fallback-model");
+        assertThat(calls).containsExactly("bad-request-model", "fallback-model");
+    }
+
+    @Test void badRequestsVisitEachConfiguredModelOnceBeforeFailing() {
+        var calls = new java.util.ArrayList<String>();
+        assertThatThrownBy(() -> runner().run(List.of("a", "b", "c"), model -> {
+            calls.add(model);
+            throw new RuntimeException("400: bad request");
+        })).hasMessageContaining("all model candidates failed");
+        assertThat(calls).containsExactly("a", "b", "c");
     }
 
     @Test void retriesTimeoutAndServerErrors() {
