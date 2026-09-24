@@ -75,7 +75,9 @@ public class ModelFailoverRunner {
             return new Failure(true, false, 0);
         }
         if (containsAny(message, "400", "bad request")) {
-            return new Failure(false, false, 0);
+            // Do not retry a malformed request on the same model, but honor the
+            // configured ordered fallback list before failing the compile run.
+            return new Failure(true, false, 0);
         }
         if (containsAny(message, "408", "timeout", "timed out", "connect", "connection reset",
                 "connection refused", "broken pipe", "502", "503", "504", "500")) {
