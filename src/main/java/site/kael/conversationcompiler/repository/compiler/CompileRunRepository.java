@@ -8,6 +8,7 @@ public interface CompileRunRepository {
     List<CompileRun> findAll(String sessionId, String status, int limit, int offset);
     Optional<CompileRun> findById(long id);
     List<CompileRunKnowledgeItem> findKnowledgeItems(long runId);
+    List<CompileRunAttempt> findAttempts(long runId);
     boolean hasActiveRun(String sessionId);
     boolean hasFailedRunAtVersion(String sessionId, long version);
     java.util.List<Long> findPendingIds(int limit);

@@ -220,3 +220,20 @@ h1 { margin: 0; color: #172033; font-size: 28px; line-height: 1.2; }
 .selected-model-index { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #e8eefc; color: #4666b0; font-size: 12px; font-weight: 700; }
 .selected-model-name { flex: 1; min-width: 0; overflow: hidden; color: var(--text-primary); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .settings-form--readonly .selected-model-row { background: #fff; }
+
+.compile-failure-section { margin: 20px 0; padding: 14px 16px; border: 1px solid #f2caca; border-radius: 10px; background: #fff8f8; }
+.failure-heading { display: flex; align-items: center; gap: 8px; color: #b42318; font-size: 14px; }
+.failure-message { margin: 10px 0 0; color: #7d3434; font-family: inherit; font-size: 13px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.compile-attempt-section { margin: 20px 0; }
+.compile-attempt-list { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.compile-attempt-card { padding: 12px 14px; border: 1px solid #e7eaf0; border-radius: 9px; background: #fff; }
+.compile-attempt-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.compile-attempt-header > div { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+.compile-attempt-header strong { overflow-wrap: anywhere; color: #3b4960; font-size: 13px; }
+.attempt-order { color: #8a96a8; font-size: 11px; }
+.attempt-error { margin-top: 9px; color: #8c3c3c; font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.attempt-success { margin-top: 8px; color: #25865a; font-size: 12px; }
+.result-icon--attempt { color: #5269aa; background: #eaf0ff; }
+
+.failure-panel-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.table-action-placeholder { color: #c0c4cc; font-size: 12px; }

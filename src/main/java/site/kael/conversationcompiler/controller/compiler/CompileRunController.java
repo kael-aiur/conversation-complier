@@ -16,6 +16,7 @@ public class CompileRunController {
     @GetMapping public List<CompileRun> list(@RequestParam(required = false) String sessionId, @RequestParam(required = false) String status, @RequestParam(defaultValue = "50") int limit, @RequestParam(defaultValue = "0") int offset) { return service.list(sessionId, status, limit, offset); }
     @GetMapping("/{id}") public CompileRun get(@PathVariable long id) { return service.get(id); }
     @GetMapping("/{id}/knowledge-items") public List<CompileRunKnowledgeItem> knowledge(@PathVariable long id) { return service.knowledge(id); }
+    @GetMapping("/{id}/attempts") public List<CompileRunAttempt> attempts(@PathVariable long id) { return service.attempts(id); }
     @PostMapping("/{id}/retry") public ResponseEntity<Map<String,Object>> retry(@PathVariable long id) { long newId = service.retry(id); return ResponseEntity.accepted().body(Map.of("id", newId, "status", "pending")); }
 
 }
