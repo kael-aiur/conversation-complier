@@ -34,4 +34,15 @@ class CompileRunControllerTest {
                 .andExpect(jsonPath("$[1].status").value("completed"));
         verify(service).attempts(42);
     }
+
+    @Test
+    void retryReturnsTheSameCompileRunId() throws Exception {
+        when(service.retry(42)).thenReturn(42L);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/compile-runs/42/retry"))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.id").value(42))
+                .andExpect(jsonPath("$.status").value("pending"))
+                .andExpect(jsonPath("$.reusedRecord").value(true));
+        verify(service).retry(42);
+    }
 }

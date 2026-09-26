@@ -59,7 +59,35 @@ public class JdbcCompileRunRepository implements CompileRunRepository {
 
     @Override
     public boolean hasFailedRunAtVersion(String sessionId, long version) {
-        return jdbc.queryForObject("SELECT COUNT(*) FROM compile_runs WHERE session_id=? AND status='failed' AND to_version=?", Integer.class, sessionId, version) > 0;
+        return jdbc.queryForObject("""
+                SELECT COUNT(*) FROM compile_runs r
+                JOIN conversations c ON c.session_id=r.session_id
+                WHERE r.session_id=? AND r.status='failed'
+                  AND r.from_version<=? AND r.to_version>c.compiled_version
+                """, Integer.class, sessionId, version) > 0;
+    }
+
+    @Override
+    public boolean requeueFailed(long runId) {
+        String now = Instant.now().toString();
+        return jdbc.update("""
+                UPDATE compile_runs AS target SET status='pending', phase='queued', progress=0,
+                    error_message=NULL, started_at=NULL, finished_at=NULL, summary=NULL,
+                    knowledge_count=(SELECT COUNT(*) FROM compile_run_knowledge_items WHERE compile_run_id=target.id),
+                    result_json=NULL, queued_at=?, updated_at=?
+                WHERE target.id=? AND target.status='failed'
+                  AND NOT EXISTS (
+                    SELECT 1 FROM compile_runs active
+                    WHERE active.session_id=target.session_id AND active.id<>target.id
+                      AND active.status IN ('pending','running')
+                  )
+                """, now, now, runId) == 1;
+    }
+
+    @Override
+    public boolean truncatePendingRun(long runId, long toVersion, long toEventId, long eventCount) {
+        return jdbc.update("UPDATE compile_runs SET to_version=?,to_event_id=?,event_count=?,updated_at=? WHERE id=? AND status IN ('pending','running') AND to_version>=?",
+                toVersion, toEventId, eventCount, Instant.now().toString(), runId, toVersion) == 1;
     }
 
     @Override
