@@ -5,6 +5,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import site.kael.conversationcompiler.controller.ApiExceptionHandler;
 import site.kael.conversationcompiler.domain.compiler.CompileRunAttempt;
+import site.kael.conversationcompiler.domain.compiler.CompileRunTraceEntry;
 import site.kael.conversationcompiler.service.compiler.CompileRunService;
 
 import java.util.List;
@@ -33,6 +34,17 @@ class CompileRunControllerTest {
                 .andExpect(jsonPath("$[0].errorMessage").value("HTTP 400: invalid request"))
                 .andExpect(jsonPath("$[1].status").value("completed"));
         verify(service).attempts(42);
+    }
+
+    @Test
+    void returnsLiveTraceForCompileRun() throws Exception {
+        when(service.trace(42)).thenReturn(List.of(new CompileRunTraceEntry(1, 42, 9L, "model_call", "assistant",
+                "模型请求", "正在等待模型响应…", "running", "created", "updated")));
+        mvc.perform(get("/api/v1/compile-runs/42/trace"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].eventType").value("model_call"))
+                .andExpect(jsonPath("$[0].status").value("running"));
+        verify(service).trace(42);
     }
 
     @Test

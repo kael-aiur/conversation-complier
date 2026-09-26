@@ -57,6 +57,19 @@ class ModelFailoverRunnerTest {
         assertThat(calls).containsExactly("a", "b", "c");
     }
 
+    @Test void failsOverWhenModelDoesNotCallRequiredCompileResultTool() {
+        var calls = new java.util.ArrayList<String>();
+        String result = runner().run(List.of("no-tool-model", "tool-capable-fallback"), model -> {
+            calls.add(model);
+            if (model.equals("no-tool-model")) {
+                throw new IllegalStateException("compiler agent failed: compiler agent did not call compile_result");
+            }
+            return model;
+        });
+        assertThat(result).isEqualTo("tool-capable-fallback");
+        assertThat(calls).containsExactly("no-tool-model", "tool-capable-fallback");
+    }
+
     @Test void retriesTimeoutAndServerErrors() {
         var calls = new AtomicInteger();
         String result = runner().run(List.of("a"), m -> {

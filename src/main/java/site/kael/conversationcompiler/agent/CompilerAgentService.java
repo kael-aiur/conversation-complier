@@ -61,17 +61,19 @@ public class CompilerAgentService {
         List<String> candidates = selections.stream().map(selection -> selection.providerId() + "\n" + selection.modelName()).distinct().toList();
         return failover.run(candidates, candidate -> {
             String[] parts = candidate.split("\n", 2);
-            return runOnce(compileRunId, requirements, parts[0], parts[1], sessionId, fromVersion, toVersion, events);
+            return runOnce(compileRunId, requirements, parts[0], parts[1], sessionId, fromVersion, toVersion, events, observer);
         }, observer);
     }
 
-    private CompileResultRequest runOnce(long compileRunId, String requirements, String providerId, String modelName, String sessionId, long fromVersion, long toVersion, List<ConversationEvent> events) {
+    private CompileResultRequest runOnce(long compileRunId, String requirements, String providerId, String modelName, String sessionId, long fromVersion, long toVersion, List<ConversationEvent> events, ModelFailoverRunner.AttemptObserver observer) {
         collector.begin();
         try {
-            ChatClient chatClient = chatClientFactory.create(providerId, modelName);
+            ChatClient chatClient = chatClientFactory.create(providerId, modelName, new CompileRunTraceAdvisor(observer));
             List<ToolCallback> tools = new ArrayList<>();
-            mcpProviders.orderedStream().forEach(provider -> java.util.Collections.addAll(tools, provider.getToolCallbacks()));
-            tools.add(compileResultTool());
+            mcpProviders.orderedStream().forEach(provider -> {
+                for (ToolCallback callback : provider.getToolCallbacks()) tools.add(traceTool(callback, observer));
+            });
+            tools.add(traceTool(compileResultTool(), observer));
             String system = """
                     你是 Conversation Compiler 的知识整理 Agent。
                     只提取有明确证据支持的稳定事实、项目决策、用户偏好、可复用流程和实体关系。
@@ -88,12 +90,35 @@ public class CompilerAgentService {
                     --- END REQUIREMENTS ---
                     """.formatted(requirements == null ? "" : requirements);
             String user = mapper.writeValueAsString(new AgentInput(compileRunId, sessionId, fromVersion, toVersion, events));
+            observer.trace("message", "system", "系统提示词", system);
+            observer.trace("message", "user", "整理输入", user);
             chatClient.prompt().system(system).user(user).toolCallbacks(tools).call().content();
             CompileResultRequest result = collector.get();
             if (result == null) throw new IllegalStateException("compiler agent did not call compile_result");
             return result;
         } catch (Exception e) { String detail = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage(); throw new IllegalStateException("compiler agent failed: " + detail, e); }
         finally { collector.clear(); }
+    }
+
+    private ToolCallback traceTool(ToolCallback delegate, ModelFailoverRunner.AttemptObserver observer) {
+        String name = delegate.getToolDefinition().name();
+        return new ToolCallback() {
+            @Override public org.springframework.ai.tool.definition.ToolDefinition getToolDefinition() { return delegate.getToolDefinition(); }
+            @Override public org.springframework.ai.tool.metadata.ToolMetadata getToolMetadata() { return delegate.getToolMetadata(); }
+            @Override public String call(String arguments) { return invoke(arguments, null); }
+            @Override public String call(String arguments, org.springframework.ai.chat.model.ToolContext context) { return invoke(arguments, context); }
+            private String invoke(String arguments, org.springframework.ai.chat.model.ToolContext context) {
+                long traceId = observer.traceStarted("tool_execution", "tool", "执行工具：" + name, arguments);
+                try {
+                    String result = context == null ? delegate.call(arguments) : delegate.call(arguments, context);
+                    observer.traceFinished(traceId, "completed", "参数：\n" + arguments + "\n\n结果：\n" + result);
+                    return result;
+                } catch (RuntimeException error) {
+                    observer.traceFinished(traceId, "failed", "参数：\n" + arguments + "\n\n错误：\n" + (error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage()));
+                    throw error;
+                }
+            }
+        };
     }
 
     private ToolCallback compileResultTool() {

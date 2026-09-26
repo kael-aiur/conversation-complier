@@ -9,6 +9,7 @@ import site.kael.conversationcompiler.agent.CompileResultRequest;
 import site.kael.conversationcompiler.domain.SessionMetadata;
 import site.kael.conversationcompiler.repository.compiler.CompileRunExecutionRepository;
 import site.kael.conversationcompiler.repository.compiler.CompileRunRepository;
+import site.kael.conversationcompiler.repository.compiler.CompileRunTraceRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -23,6 +24,7 @@ class RepositoryIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired CompileRunExecutionRepository compileExecution;
     @Autowired CompileRunRepository compileRuns;
+    @Autowired CompileRunTraceRepository compileRunTrace;
 
     @Test
     void persistsConversationAndEventsForQueries() {
@@ -63,6 +65,26 @@ class RepositoryIntegrationTest {
 
         compileExecution.advanceCompiledVersion(sessionId, 1);
         assertThat(conversations.findById(sessionId).orElseThrow().compiledVersion()).isEqualTo(1);
+    }
+
+    @Test
+    void persistsLiveTraceMessagesAndRedactsSecrets() {
+        String sessionId = "trace-session-" + System.nanoTime();
+        conversations.createOrUpdate(new SessionMetadata(sessionId, 1d, null, "Codex", "cmd", "workspace", ""));
+        String now = java.time.Instant.now().toString();
+        jdbc.update("INSERT INTO compile_runs(session_id,from_version,to_version,status,phase,progress,trigger_type,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                sessionId, 1, 1, "running", "agent_running", 20, "manual", now, now);
+        long runId = jdbc.queryForObject("SELECT last_insert_rowid()", Long.class);
+        long attemptId = compileExecution.startAttempt(runId, "provider", "model");
+        long traceId = compileRunTrace.append(runId, attemptId, "tool_execution", "tool", "Wiki tool",
+                "{\"apiKey\":\"private-token\"}", "running");
+        compileRunTrace.update(traceId, "completed", "result: {\"apiKey\":\"private-token\"}");
+
+        var trace = compileRunTrace.findByRunId(runId);
+        assertThat(trace).hasSize(1);
+        assertThat(trace.get(0).attemptId()).isEqualTo(attemptId);
+        assertThat(trace.get(0).status()).isEqualTo("completed");
+        assertThat(trace.get(0).content()).contains("[redacted]").doesNotContain("private-token");
     }
 
     @Test

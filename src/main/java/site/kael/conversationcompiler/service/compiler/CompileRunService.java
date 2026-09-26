@@ -13,11 +13,21 @@ import java.util.List;
 public class CompileRunService {
     private final CompileRunRepository runs;
     private final ConversationQueryManager conversations;
-    public CompileRunService(CompileRunRepository runs, ConversationQueryManager conversations) { this.runs = runs; this.conversations = conversations; }
+    private final site.kael.conversationcompiler.repository.compiler.CompileRunTraceRepository trace;
+    public CompileRunService(CompileRunRepository runs, ConversationQueryManager conversations) { this(runs, conversations, null); }
+    @org.springframework.beans.factory.annotation.Autowired
+    public CompileRunService(CompileRunRepository runs, ConversationQueryManager conversations,
+                             site.kael.conversationcompiler.repository.compiler.CompileRunTraceRepository trace) {
+        this.runs = runs; this.conversations = conversations; this.trace = trace;
+    }
     public List<CompileRun> list(String sessionId, String status, int limit, int offset) { return runs.findAll(sessionId, status, Math.min(Math.max(limit, 1), 200), Math.max(offset, 0)); }
     public CompileRun get(long id) { return runs.findById(id).orElseThrow(() -> new NotFoundException("compile run not found: " + id)); }
     public List<CompileRunKnowledgeItem> knowledge(long id) { get(id); return runs.findKnowledgeItems(id); }
     public List<CompileRunAttempt> attempts(long id) { get(id); return runs.findAttempts(id); }
+    public List<CompileRunTraceEntry> trace(long id) {
+        get(id);
+        return trace == null ? List.of() : trace.findByRunId(id);
+    }
     public long retry(long id) {
         var run = get(id);
         if (run.status() != CompileRunStatus.failed) {
