@@ -78,6 +78,9 @@ class CompilerAgentServiceTest {
         assertThat(traceCalls).anyMatch(x -> x.equals("start:执行工具：okf_search"));
         assertThat(capturedTools.get()).extracting(tool -> tool.getToolDefinition().name())
                 .contains("okf_search", "compile_result");
+        var resultTool = capturedTools.get().stream().filter(tool -> tool.getToolDefinition().name().equals("compile_result"))
+                .findFirst().orElseThrow();
+        assertThat(resultTool.getToolMetadata().returnDirect()).isTrue();
         var systemCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
         var userCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
         verify(request).system(systemCaptor.capture());
