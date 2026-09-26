@@ -40,10 +40,16 @@ public class CompilerChatClientFactory {
             var options = OpenAiChatOptions.builder().baseUrl(provider.baseUrl()).apiKey(apiKey).model(modelName).timeout(Duration.ofSeconds(45)).maxRetries(0).proxy(proxy()).build();
             model = OpenAiChatModel.builder().options(options).build();
         }
-        var builder = ChatClient.builder(model).defaultAdvisors(ToolCallingAdvisor.builder().disableInternalConversationHistory().build());
+        // Keep the full tool-call exchange for the duration of this single agent run.
+        // OpenAI-compatible APIs require each tool result to follow its assistant tool_calls message.
+        var builder = ChatClient.builder(model).defaultAdvisors(toolCallingAdvisor());
         if (traceAdvisor != null) builder.defaultAdvisors(traceAdvisor);
         return builder.build();
     }
+    static ToolCallingAdvisor toolCallingAdvisor() {
+        return ToolCallingAdvisor.builder().conversationHistoryEnabled(true).build();
+    }
+
     private Proxy proxy() {
         String value = System.getenv("CONVERSATION_COMPILER_HTTP_PROXY");
         if (value == null || value.isBlank()) value = System.getenv("HTTPS_PROXY");

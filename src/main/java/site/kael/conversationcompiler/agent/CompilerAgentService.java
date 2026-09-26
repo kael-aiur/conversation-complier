@@ -123,8 +123,9 @@ public class CompilerAgentService {
 
     private ToolCallback compileResultTool() {
         return FunctionToolCallback.<CompileResultRequest, String>builder("compile_result", collector::accept)
-                .description("报告本次知识整理的总结和知识条目元数据。")
+                .description("报告本次知识整理的总结和知识条目元数据；调用后立即结束 Agent 运行。")
                 .inputType(CompileResultRequest.class)
+                .toolMetadata(org.springframework.ai.tool.metadata.ToolMetadata.builder().returnDirect(true).build())
                 .build();
     }
 
