@@ -13,6 +13,12 @@ class FailureMessageSanitizerTest {
     }
 
     @Test
+    void redactsCredentialFieldsInJsonMessages() {
+        String safe = FailureMessageSanitizer.sanitize("{\"apiKey\":\"api-secret\",\"client_secret\":\"client-secret\"}");
+        assertThat(safe).contains("[redacted]").doesNotContain("api-secret", "client-secret");
+    }
+
+    @Test
     void redactsCredentialsEmbeddedInUrl() {
         assertThat(FailureMessageSanitizer.sanitize("failed https://user:password@example.invalid/v1"))
                 .isEqualTo("failed https://[redacted]@example.invalid/v1");

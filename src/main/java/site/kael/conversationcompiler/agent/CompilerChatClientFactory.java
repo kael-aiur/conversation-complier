@@ -5,6 +5,7 @@ import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import com.anthropic.models.messages.Model;
 import org.springframework.ai.chat.client.advisor.ToolCallingAdvisor;
+import org.springframework.ai.chat.client.advisor.api.CallAdvisor;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.stereotype.Component;
@@ -24,6 +25,10 @@ public class CompilerChatClientFactory {
     public CompilerChatClientFactory(ModelProviderRepository providers, ApiKeyEncryptionService crypto) { this.providers = providers; this.crypto = crypto; }
 
     public ChatClient create(String providerId, String modelName) {
+        return create(providerId, modelName, null);
+    }
+
+    public ChatClient create(String providerId, String modelName, CallAdvisor traceAdvisor) {
         var provider = providers.findById(providerId).orElseThrow(() -> new BadRequestException("provider not found: " + providerId));
         if (!provider.enabled()) throw new BadRequestException("provider is disabled");
         String apiKey = crypto.decrypt(providers.findEncryptedApiKey(providerId));
@@ -35,7 +40,9 @@ public class CompilerChatClientFactory {
             var options = OpenAiChatOptions.builder().baseUrl(provider.baseUrl()).apiKey(apiKey).model(modelName).timeout(Duration.ofSeconds(45)).maxRetries(0).proxy(proxy()).build();
             model = OpenAiChatModel.builder().options(options).build();
         }
-        return ChatClient.builder(model).defaultAdvisors(ToolCallingAdvisor.builder().disableInternalConversationHistory().build()).build();
+        var builder = ChatClient.builder(model).defaultAdvisors(ToolCallingAdvisor.builder().disableInternalConversationHistory().build());
+        if (traceAdvisor != null) builder.defaultAdvisors(traceAdvisor);
+        return builder.build();
     }
     private Proxy proxy() {
         String value = System.getenv("CONVERSATION_COMPILER_HTTP_PROXY");

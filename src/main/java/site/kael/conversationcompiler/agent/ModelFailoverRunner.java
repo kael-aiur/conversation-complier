@@ -9,6 +9,9 @@ public class ModelFailoverRunner {
     public interface AttemptObserver {
         void started(String candidate, int attempt);
         void finished(String candidate, int attempt, String status, Throwable error);
+        default long traceStarted(String eventType, String role, String title, String content) { return 0L; }
+        default void trace(String eventType, String role, String title, String content) { }
+        default void traceFinished(long traceId, String status, String content) { }
     }
 
     private final LongConsumer sleeper;
@@ -70,6 +73,11 @@ public class ModelFailoverRunner {
         String message = errorMessage(error).toLowerCase();
         if (containsAny(message, "429", "rate limit", "too many requests")) {
             return new Failure(true, true, retryAfterMillis(message, 1_000));
+        }
+        if (containsAny(message, "compiler agent did not call compile_result")) {
+            // A model may return ordinary text instead of invoking the mandatory result tool.
+            // Retrying the same model rarely changes that behavior; try the next configured model.
+            return new Failure(true, false, 0);
         }
         if (containsAny(message, "401", "403", "unauthorized", "forbidden")) {
             return new Failure(true, false, 0);

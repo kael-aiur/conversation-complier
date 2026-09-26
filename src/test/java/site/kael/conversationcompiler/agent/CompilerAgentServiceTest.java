@@ -32,8 +32,9 @@ class CompilerAgentServiceTest {
         var mcpDefinition = DefaultToolDefinition.builder().name("okf_search").description("search").inputSchema("{}").build();
         when(mcpTool.getToolDefinition()).thenReturn(mcpDefinition);
         when(mcpProvider.getToolCallbacks()).thenReturn(new ToolCallback[]{mcpTool});
+        when(mcpTool.call(anyString())).thenReturn("search results");
         when(providerRepository.findAll()).thenReturn(List.of());
-        when(factory.create("provider", "model")).thenReturn(client);
+        when(factory.create(eq("provider"), eq("model"), any(org.springframework.ai.chat.client.advisor.api.CallAdvisor.class))).thenReturn(client);
         when(client.prompt()).thenReturn(request);
         when(request.system(anyString())).thenReturn(request);
         when(request.user(anyString())).thenReturn(request);
@@ -54,6 +55,7 @@ class CompilerAgentServiceTest {
             return response;
         });
 
+        var traceCalls = new java.util.ArrayList<String>();
         var collector = new CompileResultCollector(mapper);
         var service = new CompilerAgentService(factory, mapper, collector, mockProvider(mcpProvider), providerRepository);
         var result = service.compile(42L, "整理稳定事实", "provider", "model", "session",
@@ -61,9 +63,19 @@ class CompilerAgentServiceTest {
                 new ModelFailoverRunner.AttemptObserver() {
                     public void started(String candidate, int attempt) { }
                     public void finished(String candidate, int attempt, String status, Throwable error) { }
+                    public long traceStarted(String eventType, String role, String title, String content) { traceCalls.add("start:" + title); return traceCalls.size(); }
+                    public void trace(String eventType, String role, String title, String content) { traceCalls.add("message:" + title); }
+                    public void traceFinished(long traceId, String status, String content) { traceCalls.add(status + ":" + content); }
                 });
 
         assertThat(result.summary()).isEqualTo("done");
+        assertThat(traceCalls).anyMatch(x -> x.equals("message:系统提示词"));
+        assertThat(traceCalls).anyMatch(x -> x.equals("message:整理输入"));
+        assertThat(traceCalls).anyMatch(x -> x.equals("start:执行工具：compile_result"));
+        assertThat(traceCalls).anyMatch(x -> x.contains("completed:参数："));
+        capturedTools.get().stream().filter(tool -> tool.getToolDefinition().name().equals("okf_search"))
+                .findFirst().orElseThrow().call("{\"query\":\"x\"}");
+        assertThat(traceCalls).anyMatch(x -> x.equals("start:执行工具：okf_search"));
         assertThat(capturedTools.get()).extracting(tool -> tool.getToolDefinition().name())
                 .contains("okf_search", "compile_result");
         var systemCaptor = org.mockito.ArgumentCaptor.forClass(String.class);

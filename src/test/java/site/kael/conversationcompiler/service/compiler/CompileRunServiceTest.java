@@ -5,6 +5,7 @@ import site.kael.conversationcompiler.common.ConflictException;
 import site.kael.conversationcompiler.domain.compiler.*;
 import site.kael.conversationcompiler.manager.ConversationQueryManager;
 import site.kael.conversationcompiler.repository.compiler.CompileRunRepository;
+import site.kael.conversationcompiler.repository.compiler.CompileRunTraceRepository;
 
 import java.util.Optional;
 
@@ -16,6 +17,17 @@ class CompileRunServiceTest {
     private final CompileRunRepository runs = mock(CompileRunRepository.class);
     private final ConversationQueryManager conversations = mock(ConversationQueryManager.class);
     private final CompileRunService service = new CompileRunService(runs, conversations);
+    private final CompileRunTraceRepository traces = mock(CompileRunTraceRepository.class);
+
+    @Test
+    void traceRetrievalRequiresExistingRunAndReturnsPersistedMessages() {
+        when(runs.findById(17)).thenReturn(Optional.of(run(17, CompileRunStatus.running)));
+        var entry = new CompileRunTraceEntry(1, 17, 4L, "model_call", "assistant", "模型请求", "处理中", "running", "created", "updated");
+        when(traces.findByRunId(17)).thenReturn(java.util.List.of(entry));
+        var traceService = new CompileRunService(runs, conversations, traces);
+        assertThat(traceService.trace(17)).containsExactly(entry);
+        verify(traces).findByRunId(17);
+    }
 
     @Test
     void retryRequeuesSameFailedRecordInsteadOfCreatingAnother() {

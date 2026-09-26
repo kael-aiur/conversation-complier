@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   ChatDotRound,
@@ -37,6 +37,8 @@ const selectedSession = ref(null)
 const selectedEvents = ref([])
 const compileDrawerVisible = ref(false)
 const selectedCompileRun = ref(null)
+let compileRunPollTimer = null
+let refreshingCompileRun = false
 const settingsTab = ref('knowledge')
 const providerDrawerVisible = ref(false)
 const providerDrawerMode = ref('create')
@@ -52,6 +54,7 @@ const knowledgeSettingsEditing = ref(false)
 const savingKnowledgeSettings = ref(false)
 const providerForm = ref(createProviderForm())
 const compileSessionFilter = ref('')
+const activeTraceEntry = computed(() => selectedCompileRun.value?.trace?.slice().reverse().find((entry) => entry.status === 'running'))
 
 const providers = ref([])
 
@@ -291,6 +294,7 @@ function formatUpdatedAt(value) {
 }
 
 onMounted(() => { loadSessions(); loadCompileRuns(); loadProviders(); loadKnowledgeSettings() })
+onUnmounted(stopCompileRunPolling)
 
 function toggleSidebar() {
   isCollapsed.value = !isCollapsed.value
@@ -463,32 +467,70 @@ async function retryCompileRun(run) {
   }
 }
 
-async function openCompileRun(run) {
-  selectedCompileRun.value = run
-  selectedCompileRun.value.knowledge = []
-  selectedCompileRun.value.attempts = []
-  compileDrawerVisible.value = true
-  loadingCompileDetail.value = true
+async function refreshCompileRunDetails(runId, initial = false) {
+  if (refreshingCompileRun || selectedCompileRun.value?.id !== runId) return
+  refreshingCompileRun = true
   try {
-    const [detailResponse, itemsResponse, attemptsResponse] = await Promise.all([
-      fetch(`/api/v1/compile-runs/${run.id}`),
-      fetch(`/api/v1/compile-runs/${run.id}/knowledge-items`),
-      fetch(`/api/v1/compile-runs/${run.id}/attempts`),
+    const [detailResponse, itemsResponse, attemptsResponse, traceResponse] = await Promise.all([
+      fetch(`/api/v1/compile-runs/${runId}`),
+      fetch(`/api/v1/compile-runs/${runId}/knowledge-items`),
+      fetch(`/api/v1/compile-runs/${runId}/attempts`),
+      fetch(`/api/v1/compile-runs/${runId}/trace`),
     ])
-    if (!detailResponse.ok || !itemsResponse.ok || !attemptsResponse.ok) throw new Error('整理记录详情加载失败')
+    if (!detailResponse.ok || !itemsResponse.ok || !attemptsResponse.ok || !traceResponse.ok) throw new Error('整理记录详情加载失败')
     const detail = await detailResponse.json()
     const items = await itemsResponse.json()
     const attempts = await attemptsResponse.json()
+    const trace = await traceResponse.json()
+    if (selectedCompileRun.value?.id !== runId) return
     selectedCompileRun.value = {
       ...normalizeCompileRun(detail),
       knowledge: items.map((item) => item.summary || item.title),
       attempts,
+      trace,
+    }
+    compileRuns.value = compileRuns.value.map((run) => run.id === runId ? { ...run, ...normalizeCompileRun(detail) } : run)
+    if (!['pending', 'running'].includes(detail.status)) {
+      stopCompileRunPolling()
+      await loadCompileRuns()
     }
   } catch (error) {
-    apiError.value = error.message
+    if (initial) apiError.value = error.message
   } finally {
-    loadingCompileDetail.value = false
+    refreshingCompileRun = false
+    if (initial) loadingCompileDetail.value = false
   }
+}
+
+function startCompileRunPolling(runId) {
+  stopCompileRunPolling()
+  compileRunPollTimer = window.setInterval(() => refreshCompileRunDetails(runId), 1800)
+}
+
+function stopCompileRunPolling() {
+  if (compileRunPollTimer !== null) window.clearInterval(compileRunPollTimer)
+  compileRunPollTimer = null
+}
+
+async function openCompileRun(run) {
+  stopCompileRunPolling()
+  selectedCompileRun.value = { ...run, trace: [], knowledge: [], attempts: [] }
+  compileDrawerVisible.value = true
+  loadingCompileDetail.value = true
+  await refreshCompileRunDetails(run.id, true)
+  if (['pending', 'running'].includes(selectedCompileRun.value?.status)) startCompileRunPolling(run.id)
+}
+
+function closeCompileRunDrawer() {
+  stopCompileRunPolling()
+}
+
+function traceRoleLabel(role) {
+  return ({ system: '系统', user: '输入', assistant: '助手', tool: '工具' }[role] || role || '过程')
+}
+
+function traceStatusLabel(status) {
+  return ({ running: '处理中', completed: '完成', failed: '失败' }[status] || status)
 }
 
 function eventIcon(type) {
@@ -705,7 +747,7 @@ function eventIcon(type) {
         </div>
       </div>
     </el-drawer>
-    <el-drawer v-model="compileDrawerVisible" :size="isCollapsed ? 'calc(100vw - 72px)' : 'calc(100vw - 240px)'" direction="rtl" class="compile-drawer">
+    <el-drawer v-model="compileDrawerVisible" :size="isCollapsed ? 'calc(100vw - 72px)' : 'calc(100vw - 240px)'" direction="rtl" class="compile-drawer" @closed="closeCompileRunDrawer">
       <template #header>
         <div class="drawer-heading">
           <div><strong>{{ selectedCompileRun?.sessionTitle || '整理记录' }}</strong><span>{{ selectedCompileRun?.id }} · {{ selectedCompileRun?.sessionId }}</span></div>
@@ -721,6 +763,23 @@ function eventIcon(type) {
           <div><span>耗时</span><strong>{{ selectedCompileRun.duration }}</strong></div>
           <div><span>生成条目</span><strong>{{ selectedCompileRun.knowledgeCount }}</strong></div>
         </div>
+        <section class="compile-trace-section">
+          <div class="result-section-title"><span class="result-icon result-icon--attempt">⌁</span><strong>执行过程</strong><span class="result-count">{{ selectedCompileRun.trace?.length || 0 }}</span><el-tag v-if="['pending','running'].includes(selectedCompileRun.status)" type="primary" effect="light" round size="small">实时更新</el-tag></div>
+          <div v-if="['pending','running'].includes(selectedCompileRun.status)" class="compile-trace-live">
+            <span class="trace-live-dot" :class="{ 'trace-live-dot--working': activeTraceEntry }"></span>
+            <span>{{ activeTraceEntry ? `${activeTraceEntry.title} · 处理中` : (selectedCompileRun.status === 'pending' ? '等待 Worker 开始处理…' : '正在准备下一步…') }}</span>
+          </div>
+          <el-empty v-if="!selectedCompileRun.trace?.length" :description="['pending','running'].includes(selectedCompileRun.status) ? '等待执行过程消息…' : '此记录创建于过程追踪功能启用前，暂无执行过程明细。'" :image-size="56" />
+          <div v-else class="compile-trace-list">
+            <article v-for="entry in selectedCompileRun.trace" :key="entry.id" class="compile-trace-entry" :class="`compile-trace-entry--${entry.status}`">
+              <div class="trace-entry-marker"><span v-if="entry.status === 'running'" class="trace-spinner"></span><span v-else-if="entry.status === 'failed'">!</span><span v-else>•</span></div>
+              <div class="trace-entry-body">
+                <div class="trace-entry-header"><div><el-tag size="small" effect="plain">{{ traceRoleLabel(entry.role) }}</el-tag><strong>{{ entry.title }}</strong></div><div><el-tag :type="entry.status === 'failed' ? 'danger' : entry.status === 'running' ? 'primary' : 'info'" size="small" effect="light">{{ traceStatusLabel(entry.status) }}</el-tag><time>{{ formatUpdatedAt(entry.createdAt) }}</time></div></div>
+                <pre v-if="entry.content" class="trace-entry-content">{{ entry.content }}</pre>
+              </div>
+            </article>
+          </div>
+        </section>
         <section v-if="selectedCompileRun.status === 'failed'" class="compile-failure-section">
           <div class="failure-panel-header">
             <div class="failure-heading"><el-icon><WarningFilled /></el-icon><strong>失败原因</strong></div>

@@ -147,4 +147,20 @@ CREATE TABLE IF NOT EXISTS compile_run_attempts (
     FOREIGN KEY (compile_run_id) REFERENCES compile_runs(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_compile_run_attempts_run ON compile_run_attempts(compile_run_id);
+
+CREATE TABLE IF NOT EXISTS compile_run_trace_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    compile_run_id INTEGER NOT NULL,
+    attempt_id INTEGER,
+    event_type TEXT NOT NULL,
+    role TEXT NOT NULL,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'completed',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (compile_run_id) REFERENCES compile_runs(id) ON DELETE CASCADE,
+    FOREIGN KEY (attempt_id) REFERENCES compile_run_attempts(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_compile_run_trace_run ON compile_run_trace_events(compile_run_id, id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_compile_runs_one_active_per_session ON compile_runs(session_id) WHERE status IN ('pending','running');
