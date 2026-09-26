@@ -18,6 +18,7 @@ import {
   Delete,
   Setting,
   User,
+  WarningFilled,
 } from '@element-plus/icons-vue'
 
 const isCollapsed = ref(false)
@@ -28,6 +29,7 @@ const loadingSessions = ref(false)
 const loadingEvents = ref(false)
 const loadingCompileRuns = ref(false)
 const loadingCompileDetail = ref(false)
+const retryingCompileRunId = ref(null)
 const apiError = ref('')
 const searchText = ref('')
 const drawerVisible = ref(false)
@@ -199,6 +201,7 @@ function normalizeCompileRun(run) {
     startedAt: formatUpdatedAt(run.startedAt),
     duration: run.durationSeconds ? `${Math.floor(run.durationSeconds / 60)} 分 ${run.durationSeconds % 60} 秒` : (run.status === 'running' ? '进行中' : '暂无'),
     knowledge: [],
+    attempts: [],
   }
 }
 
@@ -307,6 +310,14 @@ function compileStatusLabel(status) {
 
 function compileStatusType(status) {
   return { completed: 'success', running: 'primary', failed: 'danger' }[status] || 'info'
+}
+
+function attemptStatusLabel(status) {
+  return { completed: '成功', failed: '失败', running: '进行中' }[status] || status
+}
+
+function attemptStatusType(status) {
+  return { completed: 'success', failed: 'danger', running: 'primary' }[status] || 'info'
 }
 
 function openProviderCreate() {
@@ -426,20 +437,50 @@ function removeSelectedModel(index) {
   selectedModels.value = selectedModels.value.filter((_, currentIndex) => currentIndex !== index)
 }
 
+async function retryCompileRun(run) {
+  if (!run || run.status !== 'failed' || retryingCompileRunId.value !== null) return
+  retryingCompileRunId.value = run.id
+  try {
+    const response = await fetch(`/api/v1/compile-runs/${run.id}/retry`, { method: 'POST' })
+    if (!response.ok) {
+      let message = `HTTP ${response.status}`
+      try {
+        const detail = await response.json()
+        message = detail.message || detail.detail || message
+      } catch { /* use status when response body is not JSON */ }
+      throw new Error(message)
+    }
+    const created = await response.json()
+    await loadCompileRuns()
+    ElMessage({ message: `已创建重试记录 #${created.id}`, type: 'success', duration: 3000, showClose: true })
+  } catch (error) {
+    ElMessage({ message: `重试失败：${error.message}`, type: 'error', duration: 4000, showClose: true })
+  } finally {
+    retryingCompileRunId.value = null
+  }
+}
+
 async function openCompileRun(run) {
   selectedCompileRun.value = run
   selectedCompileRun.value.knowledge = []
+  selectedCompileRun.value.attempts = []
   compileDrawerVisible.value = true
   loadingCompileDetail.value = true
   try {
-    const [detailResponse, itemsResponse] = await Promise.all([
+    const [detailResponse, itemsResponse, attemptsResponse] = await Promise.all([
       fetch(`/api/v1/compile-runs/${run.id}`),
       fetch(`/api/v1/compile-runs/${run.id}/knowledge-items`),
+      fetch(`/api/v1/compile-runs/${run.id}/attempts`),
     ])
-    if (!detailResponse.ok || !itemsResponse.ok) throw new Error('整理记录详情加载失败')
+    if (!detailResponse.ok || !itemsResponse.ok || !attemptsResponse.ok) throw new Error('整理记录详情加载失败')
     const detail = await detailResponse.json()
     const items = await itemsResponse.json()
-    selectedCompileRun.value = { ...normalizeCompileRun(detail), knowledge: items.map((item) => item.summary || item.title) }
+    const attempts = await attemptsResponse.json()
+    selectedCompileRun.value = {
+      ...normalizeCompileRun(detail),
+      knowledge: items.map((item) => item.summary || item.title),
+      attempts,
+    }
   } catch (error) {
     apiError.value = error.message
   } finally {
@@ -558,6 +599,12 @@ function eventIcon(type) {
               <el-table-column label="知识条目" width="110"><template #default="{ row }"><span class="event-count">{{ row.knowledgeCount }}</span></template></el-table-column>
               <el-table-column prop="startedAt" label="开始时间" width="125" />
               <el-table-column prop="duration" label="耗时" width="110" />
+              <el-table-column label="操作" width="120" fixed="right">
+                <template #default="{ row }">
+                  <el-button v-if="row.status === 'failed'" text type="primary" :loading="retryingCompileRunId === row.id" :disabled="retryingCompileRunId !== null && retryingCompileRunId !== row.id" @click.stop="retryCompileRun(row)">重试</el-button>
+                  <span v-else class="table-action-placeholder">—</span>
+                </template>
+              </el-table-column>
             </el-table>
           </el-card>
         </template>
@@ -671,6 +718,28 @@ function eventIcon(type) {
           <div><span>耗时</span><strong>{{ selectedCompileRun.duration }}</strong></div>
           <div><span>生成条目</span><strong>{{ selectedCompileRun.knowledgeCount }}</strong></div>
         </div>
+        <section v-if="selectedCompileRun.status === 'failed'" class="compile-failure-section">
+          <div class="failure-panel-header">
+            <div class="failure-heading"><el-icon><WarningFilled /></el-icon><strong>失败原因</strong></div>
+            <el-button type="primary" size="small" :loading="retryingCompileRunId === selectedCompileRun.id" :disabled="retryingCompileRunId !== null && retryingCompileRunId !== selectedCompileRun.id" @click="retryCompileRun(selectedCompileRun)">重试整理</el-button>
+          </div>
+          <pre class="failure-message">{{ selectedCompileRun.errorMessage || '任务失败，但服务端没有返回具体错误信息。' }}</pre>
+        </section>
+        <section v-if="selectedCompileRun.attempts?.length" class="compile-attempt-section">
+          <div class="result-section-title"><span class="result-icon result-icon--attempt">↻</span><strong>模型尝试记录</strong><span class="result-count">{{ selectedCompileRun.attempts.length }}</span></div>
+          <div class="compile-attempt-list">
+            <article v-for="attempt in selectedCompileRun.attempts" :key="attempt.id" class="compile-attempt-card">
+              <div class="compile-attempt-header">
+                <div><span class="attempt-order">第 {{ attempt.attemptNumber }} 次</span><strong>{{ attempt.providerName || attempt.providerId }} / {{ attempt.modelName }}</strong></div>
+                <el-tag :type="attemptStatusType(attempt.status)" effect="light" round size="small">{{ attemptStatusLabel(attempt.status) }}</el-tag>
+              </div>
+              <div v-if="attempt.errorMessage" class="attempt-error">
+                <span v-if="attempt.errorType">{{ attempt.errorType }} · </span>{{ attempt.errorMessage }}
+              </div>
+              <div v-else-if="attempt.status === 'completed'" class="attempt-success">模型调用成功</div>
+            </article>
+          </div>
+        </section>
         <el-divider content-position="left">整理结果</el-divider>
         <section class="result-section">
           <div class="result-section-title"><span class="result-icon result-icon--summary">∑</span><strong>结果总结</strong></div>

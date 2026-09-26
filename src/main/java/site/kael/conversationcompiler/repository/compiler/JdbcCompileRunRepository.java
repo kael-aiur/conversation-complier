@@ -41,6 +41,15 @@ public class JdbcCompileRunRepository implements CompileRunRepository {
     }
 
     @Override
+    public List<CompileRunAttempt> findAttempts(long runId) {
+        return jdbc.query("SELECT a.*,p.name provider_name FROM compile_run_attempts a LEFT JOIN model_providers p ON p.id=a.provider_id WHERE a.compile_run_id=? ORDER BY a.attempt_number ASC, a.id ASC", (r,n) ->
+                new CompileRunAttempt(r.getLong("id"), r.getLong("compile_run_id"), r.getInt("attempt_number"),
+                        r.getString("provider_id"), r.getString("provider_name"), r.getString("model_name"), r.getString("status"),
+                        r.getString("error_type"), site.kael.conversationcompiler.common.FailureMessageSanitizer.sanitize(r.getString("error_message")),
+                        r.getInt("tool_call_count"), r.getInt("mcp_call_count"), r.getString("started_at"), r.getString("finished_at")), runId);
+    }
+
+    @Override
     public boolean hasActiveRun(String sessionId) {
         return jdbc.queryForObject("SELECT COUNT(*) FROM compile_runs WHERE session_id=? AND status IN ('pending','running')", Integer.class, sessionId) > 0;
     }
@@ -79,7 +88,7 @@ public class JdbcCompileRunRepository implements CompileRunRepository {
                     nullableLong(r, "to_event_id"), nullableLong(r, "event_count"), CompileRunStatus.valueOf(r.getString("status")),
                     r.getString("phase"), r.getInt("progress"), CompileTriggerType.valueOf(r.getString("trigger_type")),
                     r.getString("summary"), nullableLong(r, "knowledge_count"), r.getString("queued_at"), started,
-                    finished, duration, r.getString("error_message"), r.getString("compiler_version"),
+                    finished, duration, site.kael.conversationcompiler.common.FailureMessageSanitizer.sanitize(r.getString("error_message")), r.getString("compiler_version"),
                     r.getString("created_at"), r.getString("updated_at"));
         };
     }

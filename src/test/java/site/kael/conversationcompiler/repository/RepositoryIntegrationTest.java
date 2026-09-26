@@ -8,6 +8,7 @@ import org.springframework.test.context.TestPropertySource;
 import site.kael.conversationcompiler.agent.CompileResultRequest;
 import site.kael.conversationcompiler.domain.SessionMetadata;
 import site.kael.conversationcompiler.repository.compiler.CompileRunExecutionRepository;
+import site.kael.conversationcompiler.repository.compiler.CompileRunRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -21,6 +22,7 @@ class RepositoryIntegrationTest {
     @Autowired EventRepository events;
     @Autowired JdbcTemplate jdbc;
     @Autowired CompileRunExecutionRepository compileExecution;
+    @Autowired CompileRunRepository compileRuns;
 
     @Test
     void persistsConversationAndEventsForQueries() {
@@ -44,6 +46,13 @@ class RepositoryIntegrationTest {
         long runId = jdbc.queryForObject("SELECT last_insert_rowid()", Long.class);
         var item = new CompileResultRequest.KnowledgeResultItem("key", "decision", "Title", "Summary", "create", "candidate", 0.9, "wiki", "slug", "hash");
         var result = new CompileResultRequest("summary", java.util.List.of(item), java.util.List.of());
+
+        long attemptId = compileExecution.startAttempt(runId, 1, "provider-id", "model-name");
+        compileExecution.finishAttempt(attemptId, "failed", "HttpError", "HTTP 401 Authorization: Bearer sensitive-token");
+        var attempts = compileRuns.findAttempts(runId);
+        assertThat(attempts).hasSize(1);
+        assertThat(attempts.get(0).modelName()).isEqualTo("model-name");
+        assertThat(attempts.get(0).errorMessage()).contains("Bearer [redacted]").doesNotContain("sensitive-token");
 
         compileExecution.insertKnowledgeItems(runId, result);
         compileExecution.insertKnowledgeItems(runId, result);
