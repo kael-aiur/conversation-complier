@@ -452,7 +452,10 @@ async function retryCompileRun(run) {
     }
     const created = await response.json()
     await loadCompileRuns()
-    ElMessage({ message: `已创建重试记录 #${created.id}`, type: 'success', duration: 3000, showClose: true })
+    ElMessage({ message: `整理记录 #${created.id} 已重新加入队列`, type: 'success', duration: 3000, showClose: true })
+    if (selectedCompileRun.value?.id === run.id) {
+      await openCompileRun({ ...run, status: 'pending' })
+    }
   } catch (error) {
     ElMessage({ message: `重试失败：${error.message}`, type: 'error', duration: 4000, showClose: true })
   } finally {

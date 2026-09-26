@@ -11,6 +11,8 @@ public interface CompileRunRepository {
     List<CompileRunAttempt> findAttempts(long runId);
     boolean hasActiveRun(String sessionId);
     boolean hasFailedRunAtVersion(String sessionId, long version);
+    boolean requeueFailed(long runId);
+    boolean truncatePendingRun(long runId, long toVersion, long toEventId, long eventCount);
     java.util.List<Long> findPendingIds(int limit);
     long createPending(String sessionId, long fromVersion, long toVersion, long fromEventId,
                        long toEventId, long eventCount, CompileTriggerType triggerType);

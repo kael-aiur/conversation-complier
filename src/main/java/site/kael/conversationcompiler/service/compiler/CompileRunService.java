@@ -18,7 +18,24 @@ public class CompileRunService {
     public CompileRun get(long id) { return runs.findById(id).orElseThrow(() -> new NotFoundException("compile run not found: " + id)); }
     public List<CompileRunKnowledgeItem> knowledge(long id) { get(id); return runs.findKnowledgeItems(id); }
     public List<CompileRunAttempt> attempts(long id) { get(id); return runs.findAttempts(id); }
-    public long retry(long id) { var run = get(id); if (run.status() != site.kael.conversationcompiler.domain.compiler.CompileRunStatus.failed) throw new ConflictException("only failed compile runs can be retried"); return create(run.sessionId(), CompileTriggerType.retry); }
+    public long retry(long id) {
+        var run = get(id);
+        if (run.status() != CompileRunStatus.failed) {
+            throw new ConflictException("only failed compile runs can be retried");
+        }
+        try {
+            if (!runs.requeueFailed(id)) {
+                var current = get(id);
+                if (current.status() != CompileRunStatus.failed) {
+                    throw new ConflictException("compile run is no longer failed");
+                }
+                throw new ConflictException("conversation already has an active compile run");
+            }
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            throw new ConflictException("conversation already has an active compile run");
+        }
+        return id;
+    }
     public long create(String sessionId, CompileTriggerType trigger) {
         var conversation = conversations.get(sessionId);
         if (runs.hasActiveRun(sessionId)) throw new ConflictException("conversation already has an active compile run");

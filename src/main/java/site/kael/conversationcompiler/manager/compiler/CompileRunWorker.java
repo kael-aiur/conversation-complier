@@ -28,12 +28,14 @@ public class CompileRunWorker {
     private final ExecutorService executor;
     private final ScheduledExecutorService timeoutExecutor;
     private final long taskTimeoutSeconds;
+    private final int maxTurnsPerRun;
+    private final int maxCharsPerRun;
 
     /** Constructor used by unit tests and synchronous callers. */
     public CompileRunWorker(CompileRunRepository runs, CompileRunExecutionRepository execution,
                             EventRepository events, KnowledgeSettingsRepository settings,
                             CompilerAgentService agent) {
-        this(runs, execution, events, settings, agent, 1, 600, false);
+        this(runs, execution, events, settings, agent, 1, 600, 20, 200000, false);
     }
 
     @Autowired
@@ -41,19 +43,23 @@ public class CompileRunWorker {
                             EventRepository events, KnowledgeSettingsRepository settings,
                             CompilerAgentService agent,
                             @Value("${conversation-compiler.compiler.max-concurrent-runs:1}") int maxConcurrentRuns,
-                            @Value("${conversation-compiler.compiler.task-timeout-seconds:600}") long taskTimeoutSeconds) {
-        this(runs, execution, events, settings, agent, maxConcurrentRuns, taskTimeoutSeconds, true);
+                            @Value("${conversation-compiler.compiler.task-timeout-seconds:600}") long taskTimeoutSeconds,
+                            @Value("${conversation-compiler.compiler.max-turns-per-run:20}") int maxTurnsPerRun,
+                            @Value("${conversation-compiler.compiler.max-chars-per-run:200000}") int maxCharsPerRun) {
+        this(runs, execution, events, settings, agent, maxConcurrentRuns, taskTimeoutSeconds, maxTurnsPerRun, maxCharsPerRun, true);
     }
 
     private CompileRunWorker(CompileRunRepository runs, CompileRunExecutionRepository execution,
                              EventRepository events, KnowledgeSettingsRepository settings,
                              CompilerAgentService agent, int maxConcurrentRuns,
-                             long taskTimeoutSeconds, boolean background) {
+                             long taskTimeoutSeconds, int maxTurnsPerRun, int maxCharsPerRun, boolean background) {
         this.runs = runs; this.execution = execution; this.events = events;
         this.settings = settings; this.agent = agent;
         int concurrency = Math.max(1, maxConcurrentRuns);
         this.permits = new Semaphore(concurrency);
         this.taskTimeoutSeconds = Math.max(1, taskTimeoutSeconds);
+        this.maxTurnsPerRun = Math.max(1, maxTurnsPerRun);
+        this.maxCharsPerRun = Math.max(1, maxCharsPerRun);
         this.executor = background ? Executors.newFixedThreadPool(concurrency, daemonFactory("compiler-agent")) : null;
         this.timeoutExecutor = background ? Executors.newScheduledThreadPool(concurrency, daemonFactory("compiler-timeout")) : null;
     }
@@ -108,19 +114,25 @@ public class CompileRunWorker {
     private void executeClaimed(long id) {
         var run = runs.findById(id).orElseThrow();
         Map<String, Long> attempts = new HashMap<>();
-        AtomicInteger attemptSequence = new AtomicInteger();
         try {
             var setting = settings.find().orElseThrow(() -> new IllegalStateException("knowledge compile settings are not configured"));
             if (!execution.markRunning(id, "loading_events", setting.providerId(), setting.modelName(), setting.prompt())) return;
             // The range is fixed when the pending run is created. Events appended while the
             // agent is working are deliberately left for the next run.
-            var list = events.findBySessionIdAndVersionRange(run.sessionId(), run.fromVersion(), run.toVersion());
+            var sourceEvents = events.findBySessionIdAndVersionRange(run.sessionId(), run.fromVersion(), run.toVersion());
+            var selection = site.kael.conversationcompiler.agent.CompleteTurnSelector.select(sourceEvents, maxTurnsPerRun, maxCharsPerRun);
+            var list = selection.events();
+            long boundedToVersion = run.fromVersion() + selection.lastIndex();
+            var lastEventId = list.get(list.size() - 1).id();
+            if (!runs.truncatePendingRun(id, boundedToVersion, lastEventId, list.size())) {
+                throw new IllegalStateException("could not persist the bounded complete-turn snapshot");
+            }
             execution.updatePhase(id, "agent_running", 20);
             var observer = new site.kael.conversationcompiler.agent.ModelFailoverRunner.AttemptObserver() {
                 public void started(String candidate, int attempt) {
                     String[] parts = candidate.split("\\n", 2);
                     attempts.put(candidate + "#" + attempt,
-                            execution.startAttempt(id, attemptSequence.incrementAndGet(), parts[0], parts.length > 1 ? parts[1] : ""));
+                            execution.startAttempt(id, parts[0], parts.length > 1 ? parts[1] : ""));
                 }
                 public void finished(String candidate, int attempt, String status, Throwable error) {
                     Long attemptId = attempts.get(candidate + "#" + attempt);
@@ -131,13 +143,13 @@ public class CompileRunWorker {
             };
             var result = setting.models().size() == 1
                     ? agent.compile(run.id(), setting.prompt(), setting.models().get(0).providerId(), setting.models().get(0).modelName(),
-                    run.sessionId(), run.fromVersion(), run.toVersion(), list, observer)
+                    run.sessionId(), run.fromVersion(), boundedToVersion, list, observer)
                     : agent.compile(run.id(), setting.prompt(), setting.models(),
-                    run.sessionId(), run.fromVersion(), run.toVersion(), list, observer);
+                    run.sessionId(), run.fromVersion(), boundedToVersion, list, observer);
             execution.updatePhase(id, "saving_result", 90);
             execution.insertKnowledgeItems(id, result);
             if (!execution.markCompleted(id, result)) return;
-            execution.advanceCompiledVersion(run.sessionId(), run.toVersion());
+            execution.advanceCompiledVersion(run.sessionId(), boundedToVersion);
         } catch (Exception e) {
             execution.markFailed(id, rootMessage(e));
         }
