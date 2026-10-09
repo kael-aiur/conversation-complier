@@ -123,19 +123,19 @@ public class CompileRunWorker {
         try {
             var setting = settings.find().orElseThrow(() -> new IllegalStateException("knowledge compile settings are not configured"));
             if (!execution.markRunning(id, "loading_events", setting.providerId(), setting.modelName(), setting.prompt())) return;
-            appendTrace(id, null, "status", "system", "正在读取整理范围", "固定当前事件快照并检查完整对话轮次。", "completed");
+            appendTrace(id, null, "status", "system", "正在读取整理范围", "固定当前事件快照，按轮次和长度选择已采集记录；允许消息缺失。", "completed");
             // The range is fixed when the pending run is created. Events appended while the
             // agent is working are deliberately left for the next run.
             var sourceEvents = events.findBySessionIdAndVersionRange(run.sessionId(), run.fromVersion(), run.toVersion());
-            var selection = site.kael.conversationcompiler.agent.CompleteTurnSelector.select(sourceEvents, maxTurnsPerRun, maxCharsPerRun);
+            var selection = site.kael.conversationcompiler.agent.ConversationBatchSelector.select(sourceEvents, maxTurnsPerRun, maxCharsPerRun);
             var list = selection.events();
             long boundedToVersion = run.fromVersion() + selection.lastIndex();
             var lastEventId = list.get(list.size() - 1).id();
             if (!runs.truncatePendingRun(id, boundedToVersion, lastEventId, list.size())) {
-                throw new IllegalStateException("could not persist the bounded complete-turn snapshot");
+                throw new IllegalStateException("could not persist the bounded conversation snapshot");
             }
             execution.updatePhase(id, "agent_running", 20);
-            appendTrace(id, null, "status", "system", "开始知识整理", "已选择 " + selection.turns() + " 个完整对话轮次，共 " + list.size() + " 条事件。", "completed");
+            appendTrace(id, null, "status", "system", "开始知识整理", "已选择 " + selection.turns() + " 个聊天轮次（允许记录缺失），共 " + list.size() + " 条事件。", "completed");
             var attemptTraceIds = new HashMap<String, Long>();
             var activeAttemptId = new java.util.concurrent.atomic.AtomicLong(0L);
             var observer = new site.kael.conversationcompiler.agent.ModelFailoverRunner.AttemptObserver() {
