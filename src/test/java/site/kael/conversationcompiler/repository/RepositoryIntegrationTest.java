@@ -68,6 +68,23 @@ class RepositoryIntegrationTest {
     }
 
     @Test
+    void partialBatchLeavesConversationEligibleForRemainingEvents() {
+        String sessionId = "partial-batch-" + System.nanoTime();
+        conversations.createOrUpdate(new SessionMetadata(sessionId, 1d, null, "Codex", "cmd", "workspace", ""));
+        jdbc.update("UPDATE conversations SET version=10,last_event_at=1 WHERE session_id=?", sessionId);
+        compileExecution.advanceCompiledVersion(sessionId, 4);
+        var partial = conversations.findById(sessionId).orElseThrow();
+        assertThat(partial.compiledVersion()).isEqualTo(4);
+        assertThat(partial.status()).isEqualTo("stale");
+        assertThat(conversations.findIdleCandidates(100, 100)).extracting("sessionId").contains(sessionId);
+
+        compileExecution.advanceCompiledVersion(sessionId, 10);
+        assertThat(conversations.findById(sessionId).orElseThrow().status()).isEqualTo("compiled");
+        compileExecution.advanceCompiledVersion(sessionId, 4);
+        assertThat(conversations.findById(sessionId).orElseThrow().compiledVersion()).isEqualTo(10);
+    }
+
+    @Test
     void persistsLiveTraceMessagesAndRedactsSecrets() {
         String sessionId = "trace-session-" + System.nanoTime();
         conversations.createOrUpdate(new SessionMetadata(sessionId, 1d, null, "Codex", "cmd", "workspace", ""));

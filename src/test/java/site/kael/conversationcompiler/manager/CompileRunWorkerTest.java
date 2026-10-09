@@ -41,6 +41,30 @@ class CompileRunWorkerTest {
         verify(execution).advanceCompiledVersion("s",2);
     }
 
+    @Test void incompleteInputReachesAgentAndOnlySelectedBatchAdvancesVersion() {
+        var runs=mock(CompileRunRepository.class); var execution=mock(CompileRunExecutionRepository.class);
+        var events=mock(EventRepository.class); var settings=mock(KnowledgeSettingsRepository.class); var agent=mock(CompilerAgentService.class);
+        var run=new CompileRun(1,"s","title",10,51,0,0,42,CompileRunStatus.pending,"queued",0,CompileTriggerType.manual,null,0,null,null,null,0,null,"mvp","","");
+        var source=new ArrayList<ConversationEvent>();
+        for(int i=0;i<21;i++) {
+            source.add(new ConversationEvent(i*2+1,"s","u"+i,"user_prompt",1,"now","{}"));
+            source.add(new ConversationEvent(i*2+2,"s","t"+i,"tool_call",1,"now","{}"));
+        }
+        when(runs.findById(1)).thenReturn(Optional.of(run));
+        when(settings.find()).thenReturn(Optional.of(new KnowledgeCompileSettings("p","P","m",1,"prompt",true,"")));
+        when(events.findBySessionIdAndVersionRange("s",10,51)).thenReturn(source);
+        when(execution.markRunning(anyLong(),anyString(),anyString(),anyString(),anyString())).thenReturn(true);
+        when(runs.truncatePendingRun(anyLong(),anyLong(),anyLong(),anyLong())).thenReturn(true);
+        when(agent.compile(anyLong(),anyString(),anyString(),anyString(),anyString(),anyLong(),anyLong(),anyList(),any()))
+                .thenReturn(new CompileResultRequest("summary",List.of(),List.of()));
+        when(execution.markCompleted(anyLong(),any())).thenReturn(true);
+        new CompileRunWorker(runs,execution,events,settings,agent).execute(1);
+        verify(agent).compile(eq(1L),eq("prompt"),eq("p"),eq("m"),eq("s"),eq(10L),eq(49L),argThat(x -> x.size()==40),any());
+        verify(runs).truncatePendingRun(1,49,40,40);
+        verify(execution).advanceCompiledVersion("s",49);
+        verify(execution,never()).markFailed(anyLong(),anyString());
+    }
+
     @Test void failureDoesNotAdvanceVersion() {
         var runs=mock(CompileRunRepository.class); var execution=mock(CompileRunExecutionRepository.class); var events=mock(EventRepository.class); var settings=mock(KnowledgeSettingsRepository.class); var agent=mock(CompilerAgentService.class);
         var run=new CompileRun(1,"s","title",1,2,0,0,2,CompileRunStatus.pending,"queued",0,CompileTriggerType.manual,null,0,null,null,null,0,null,"mvp","","");

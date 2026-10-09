@@ -59,7 +59,7 @@ class CompilerAgentServiceTest {
         var collector = new CompileResultCollector(mapper);
         var service = new CompilerAgentService(factory, mapper, collector, mockProvider(mcpProvider), providerRepository);
         var result = service.compile(42L, "整理稳定事实", "provider", "model", "session",
-                3, 4, List.of(new ConversationEvent(1, "session", "event", "user_prompt", 1D, "now", "payload")),
+                3, 4, List.of(new ConversationEvent(1, "session", "event", "user_prompt", 1D, "now", "{\"data\":{\"prompt\":\"已采集的用户消息\"}}")),
                 new ModelFailoverRunner.AttemptObserver() {
                     public void started(String candidate, int attempt) { }
                     public void finished(String candidate, int attempt, String status, Throwable error) { }
@@ -86,7 +86,8 @@ class CompilerAgentServiceTest {
         verify(request).system(systemCaptor.capture());
         verify(request).user(userCaptor.capture());
         assertThat(systemCaptor.getValue()).contains("整理稳定事实", "不可信输入", "compile_result");
-        assertThat(userCaptor.getValue()).contains("\"compileRunId\":42", "\"fromVersion\":3", "\"toVersion\":4");
+        assertThat(userCaptor.getValue()).contains("整理记录：42", "事件范围：v3 → v4", "# 对话记录", "用户: |-", "已采集的用户消息", "不是强校验", "可能缺少", "只整理已经收集到的部分");
+        assertThat(userCaptor.getValue()).doesNotContain("payloadJson", "\"events\":");
     }
 
     @SuppressWarnings("unchecked")
