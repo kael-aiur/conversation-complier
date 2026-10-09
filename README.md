@@ -152,6 +152,8 @@ ToolResult: |-
 - `CONVERSATION_COMPILER_MAX_CHARS_PER_RUN`：默认对话模板最多 200,000 字符；超出的后续轮次留给下一批。单轮过长时可以按事件拆分，单条超长事件会明确标注内容截断，避免永远卡住。
 - 缺少助手回复或工具结果不会使整理任务失败；空事件输入、模型调用或知识库操作失败仍会正常报告错误。
 - 完成一批后只推进该批实际覆盖的事件版本；尚有剩余事件时保持待整理状态。
+- `CONVERSATION_COMPILER_MODEL_REQUEST_TIMEOUT_SECONDS`：每次模型请求的超时秒数，默认 600（10 分钟）；与整次整理任务的 `CONVERSATION_COMPILER_TASK_TIMEOUT_SECONDS`（默认 1800，即 30 分钟）分开控制。
+- 模型尝试和执行过程中的错误保留脱敏后的异常原因链，便于区分 SDK 的 `Request failed`、连接错误和实际超时。
 
 ## 测试
 

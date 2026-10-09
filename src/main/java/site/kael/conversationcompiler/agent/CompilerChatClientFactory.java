@@ -22,6 +22,8 @@ import site.kael.conversationcompiler.repository.settings.ModelProviderRepositor
 public class CompilerChatClientFactory {
     private final ModelProviderRepository providers;
     private final ApiKeyEncryptionService crypto;
+    @org.springframework.beans.factory.annotation.Value("${conversation-compiler.agent.model-request-timeout-seconds:600}")
+    private long modelRequestTimeoutSeconds = 600;
     public CompilerChatClientFactory(ModelProviderRepository providers, ApiKeyEncryptionService crypto) { this.providers = providers; this.crypto = crypto; }
 
     public ChatClient create(String providerId, String modelName) {
@@ -34,10 +36,10 @@ public class CompilerChatClientFactory {
         String apiKey = crypto.decrypt(providers.findEncryptedApiKey(providerId));
         org.springframework.ai.chat.model.ChatModel model;
         if (provider.interfaceType() == InterfaceType.anthropic) {
-            var options = AnthropicChatOptions.builder().baseUrl(provider.baseUrl()).apiKey(apiKey).model(Model.of(modelName)).timeout(Duration.ofSeconds(45)).maxRetries(0).proxy(proxy()).build();
+            var options = AnthropicChatOptions.builder().baseUrl(provider.baseUrl()).apiKey(apiKey).model(Model.of(modelName)).timeout(modelRequestTimeout()).maxRetries(0).proxy(proxy()).build();
             model = AnthropicChatModel.builder().options(options).build();
         } else {
-            var options = OpenAiChatOptions.builder().baseUrl(provider.baseUrl()).apiKey(apiKey).model(modelName).timeout(Duration.ofSeconds(45)).maxRetries(0).proxy(proxy()).build();
+            var options = OpenAiChatOptions.builder().baseUrl(provider.baseUrl()).apiKey(apiKey).model(modelName).timeout(modelRequestTimeout()).maxRetries(0).proxy(proxy()).build();
             model = OpenAiChatModel.builder().options(options).build();
         }
         // Keep the full tool-call exchange for the duration of this single agent run.
@@ -46,6 +48,10 @@ public class CompilerChatClientFactory {
         if (traceAdvisor != null) builder.defaultAdvisors(traceAdvisor);
         return builder.build();
     }
+    Duration modelRequestTimeout() {
+        return Duration.ofSeconds(Math.max(1, modelRequestTimeoutSeconds));
+    }
+
     static ToolCallingAdvisor toolCallingAdvisor() {
         return ToolCallingAdvisor.builder().conversationHistoryEnabled(true).build();
     }

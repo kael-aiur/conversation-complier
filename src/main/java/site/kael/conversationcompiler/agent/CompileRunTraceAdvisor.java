@@ -36,7 +36,7 @@ public final class CompileRunTraceAdvisor implements CallAdvisor {
             observer.traceFinished(pending, "completed", "模型已返回响应");
             return response;
         } catch (RuntimeException error) {
-            observer.traceFinished(pending, "failed", error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage());
+            observer.traceFinished(pending, "failed", site.kael.conversationcompiler.common.FailureDetails.describe(error));
             throw error;
         }
     }
