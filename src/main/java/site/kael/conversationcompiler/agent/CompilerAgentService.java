@@ -111,7 +111,7 @@ public class CompilerAgentService {
             CompileResultRequest result = collector.get();
             if (result == null) throw new IllegalStateException("compiler agent did not call compile_result");
             return result;
-        } catch (Exception e) { String detail = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage(); throw new IllegalStateException("compiler agent failed: " + detail, e); }
+        } catch (Exception e) { String detail = site.kael.conversationcompiler.common.FailureDetails.describe(e); throw new IllegalStateException("compiler agent failed: " + detail, e); }
         finally { collector.clear(); }
     }
 
@@ -129,7 +129,7 @@ public class CompilerAgentService {
                     observer.traceFinished(traceId, "completed", "参数：\n" + arguments + "\n\n结果：\n" + result);
                     return result;
                 } catch (RuntimeException error) {
-                    observer.traceFinished(traceId, "failed", "参数：\n" + arguments + "\n\n错误：\n" + (error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage()));
+                    observer.traceFinished(traceId, "failed", "参数：\n" + arguments + "\n\n错误：\n" + site.kael.conversationcompiler.common.FailureDetails.describe(error));
                     throw error;
                 }
             }

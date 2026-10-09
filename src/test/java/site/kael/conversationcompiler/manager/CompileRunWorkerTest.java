@@ -14,6 +14,12 @@ import static org.mockito.Mockito.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class CompileRunWorkerTest {
+    @Test void taskTimeoutDefaultsToThirtyMinutes() {
+        var worker = new CompileRunWorker(mock(CompileRunRepository.class),mock(CompileRunExecutionRepository.class),
+                mock(EventRepository.class),mock(KnowledgeSettingsRepository.class),mock(CompilerAgentService.class));
+        assertThat(org.springframework.test.util.ReflectionTestUtils.getField(worker,"taskTimeoutSeconds")).isEqualTo(1800L);
+    }
+
     @Test void completesRunAndAdvancesVersion() {
         var runs=mock(CompileRunRepository.class); var execution=mock(CompileRunExecutionRepository.class); var events=mock(EventRepository.class); var settings=mock(KnowledgeSettingsRepository.class); var agent=mock(CompilerAgentService.class);
         var run=new CompileRun(1,"s","title",1,2,0,0,2,CompileRunStatus.pending,"queued",0,CompileTriggerType.manual,null,0,null,null,null,0,null,"mvp","","");

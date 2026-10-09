@@ -39,7 +39,7 @@ public class CompileRunWorker {
     public CompileRunWorker(CompileRunRepository runs, CompileRunExecutionRepository execution,
                             EventRepository events, KnowledgeSettingsRepository settings,
                             CompilerAgentService agent) {
-        this(runs, execution, events, settings, agent, null, 1, 600, 20, 200000, false);
+        this(runs, execution, events, settings, agent, null, 1, 1800, 20, 200000, false);
     }
 
     @Autowired
@@ -48,7 +48,7 @@ public class CompileRunWorker {
                             CompilerAgentService agent,
                             site.kael.conversationcompiler.repository.compiler.CompileRunTraceRepository trace,
                             @Value("${conversation-compiler.compiler.max-concurrent-runs:1}") int maxConcurrentRuns,
-                            @Value("${conversation-compiler.compiler.task-timeout-seconds:600}") long taskTimeoutSeconds,
+                            @Value("${conversation-compiler.compiler.task-timeout-seconds:1800}") long taskTimeoutSeconds,
                             @Value("${conversation-compiler.compiler.max-turns-per-run:20}") int maxTurnsPerRun,
                             @Value("${conversation-compiler.compiler.max-chars-per-run:200000}") int maxCharsPerRun) {
         this(runs, execution, events, settings, agent, trace, maxConcurrentRuns, taskTimeoutSeconds, maxTurnsPerRun, maxCharsPerRun, true);
@@ -152,10 +152,10 @@ public class CompileRunWorker {
                     Long attemptId = attempts.get(candidate + "#" + attempt);
                     if (attemptId != null) execution.finishAttempt(attemptId, status,
                             error == null ? null : error.getClass().getSimpleName(),
-                            error == null ? null : error.getMessage());
+                            error == null ? null : site.kael.conversationcompiler.common.FailureDetails.describe(error));
                     Long traceId = attemptTraceIds.get(candidate + "#" + attempt);
                     if (traceId != null) updateTrace(traceId, status,
-                            error == null ? "模型请求完成，正在继续整理。" : error.getMessage());
+                            error == null ? "模型请求完成，正在继续整理。" : site.kael.conversationcompiler.common.FailureDetails.describe(error));
                     activeAttemptId.set(0L);
                 }
                 public long traceStarted(String eventType, String role, String title, String content) {
@@ -204,9 +204,7 @@ public class CompileRunWorker {
     }
 
     private String rootMessage(Throwable error) {
-        Throwable current = error;
-        while (current.getCause() != null) current = current.getCause();
-        return current.getMessage() == null ? current.toString() : current.getMessage();
+        return site.kael.conversationcompiler.common.FailureDetails.describe(error);
     }
 
     private ThreadFactory daemonFactory(String prefix) {
