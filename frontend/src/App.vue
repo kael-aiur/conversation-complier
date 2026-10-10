@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   ChatDotRound,
@@ -23,6 +23,7 @@ import {
 
 const isCollapsed = ref(false)
 const activeMenu = ref('sessions')
+const contentArea = ref(null)
 const apiStatus = ref('未检查')
 const checking = ref(false)
 const loadingSessions = ref(false)
@@ -296,6 +297,13 @@ function formatUpdatedAt(value) {
 onMounted(() => { loadSessions(); loadCompileRuns(); loadProviders(); loadKnowledgeSettings() })
 onUnmounted(stopCompileRunPolling)
 
+async function selectMenu(menu) {
+  activeMenu.value = menu
+  await nextTick()
+  const element = contentArea.value?.$el
+  if (element) element.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+}
+
 function toggleSidebar() {
   isCollapsed.value = !isCollapsed.value
 }
@@ -546,7 +554,7 @@ function eventIcon(type) {
         <div v-if="!isCollapsed" class="brand-copy"><strong>Conversation</strong><span>Compiler</span></div>
       </div>
 
-      <el-menu :default-active="activeMenu" :collapse="isCollapsed" class="sidebar-menu" @select="activeMenu = $event">
+      <el-menu :default-active="activeMenu" :collapse="isCollapsed" class="sidebar-menu" @select="selectMenu">
         <el-menu-item index="sessions">
           <el-icon><ChatDotRound /></el-icon>
           <template #title>会话列表</template>
@@ -581,7 +589,7 @@ function eventIcon(type) {
         </div>
       </el-header>
 
-      <el-main class="content-area">
+      <el-main ref="contentArea" class="content-area">
         <div class="page-heading">
           <div>
             <p class="eyebrow">CONVERSATION COMPILER</p>

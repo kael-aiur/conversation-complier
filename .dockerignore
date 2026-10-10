@@ -17,3 +17,6 @@ data
 
 # Local IDE and OS files
 *.iml
+
+# Local agent runtime traces (may contain private conversation data)
+.agent-traces/

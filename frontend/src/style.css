@@ -11,26 +11,27 @@
   --border-color: #e7ebf2;
 }
 * { box-sizing: border-box; }
-html, body, #app { min-width: 320px; min-height: 100vh; margin: 0; }
+/* The viewport owns the layout; scrolling belongs to the main content, not the document. */
+html, body, #app { min-width: 320px; height: 100%; margin: 0; overflow: hidden; }
 body { background: var(--content-bg); }
-.app-shell { min-height: 100vh; }
-.app-sidebar { position: relative; display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; background: var(--sidebar-bg); transition: width .2s ease; }
-.brand { display: flex; align-items: center; gap: 12px; height: 72px; padding: 0 22px; color: #f6f8fc; white-space: nowrap; }
+.app-shell { height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; }
+.app-sidebar { height: 100%; min-height: 0; position: relative; display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; background: var(--sidebar-bg); transition: width .2s ease; }
+.brand { flex-shrink: 0; display: flex; align-items: center; gap: 12px; height: 72px; padding: 0 22px; color: #f6f8fc; white-space: nowrap; }
 .brand--collapsed { justify-content: center; padding: 0; }
 .brand-mark { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 9px; color: #fff; background: linear-gradient(135deg, #3977e8, #65b6ff); box-shadow: 0 8px 20px rgba(45, 108, 223, .35); }
 .brand-copy { display: flex; flex-direction: column; line-height: 1.12; }
 .brand-copy strong { font-size: 14px; letter-spacing: .01em; }
 .brand-copy span { margin-top: 3px; color: var(--sidebar-muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
-.sidebar-menu { flex: 1; border-right: 0; background: transparent; --el-menu-bg-color: transparent; --el-menu-text-color: var(--sidebar-muted); --el-menu-hover-bg-color: rgba(255,255,255,.06); --el-menu-active-color: #fff; }
+.sidebar-menu { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; border-right: 0; background: transparent; --el-menu-bg-color: transparent; --el-menu-text-color: var(--sidebar-muted); --el-menu-hover-bg-color: rgba(255,255,255,.06); --el-menu-active-color: #fff; }
 .sidebar-menu .el-menu-item { height: 48px; margin: 4px 12px; border-radius: 9px; }
 .sidebar-menu .el-menu-item.is-active { background: var(--sidebar-active); box-shadow: 0 7px 18px rgba(45, 108, 223, .22); }
 .sidebar-menu .el-icon { margin-right: 10px; }
-.sidebar-footer { padding: 18px 20px 22px; color: var(--sidebar-muted); font-size: 12px; }
+.sidebar-footer { flex-shrink: 0; padding: 18px 20px 22px; color: var(--sidebar-muted); font-size: 12px; }
 .worker-status { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #42d392; box-shadow: 0 0 0 4px rgba(66, 211, 146, .12); }
 .version-label { margin-top: 12px; color: #66758b; font-size: 11px; }
-.main-container { min-width: 0; }
-.topbar { display: flex; align-items: center; justify-content: space-between; height: 72px; padding: 0 30px; border-bottom: 1px solid var(--border-color); background: #fff; }
+.main-container { flex: 1; min-width: 0; min-height: 0; height: 100%; overflow: hidden; }
+.topbar { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; height: 72px; padding: 0 30px; border-bottom: 1px solid var(--border-color); background: #fff; }
 .topbar-left, .topbar-right { display: flex; align-items: center; }
 .collapse-button { margin-right: 14px; color: #66758b; }
 .breadcrumb { display: flex; align-items: center; gap: 10px; color: #8a95a7; font-size: 13px; }
@@ -40,7 +41,8 @@ body { background: var(--content-bg); }
 .topbar-icon { color: #718096; }
 .user-avatar { color: #3768c8; background: #e8efff; }
 .user-name { color: #46546b; font-size: 13px; }
-.content-area { padding: 34px 36px 48px; overflow: auto; }
+/* Title, metrics and the full list scroll together beneath the fixed 72px topbar. */
+.content-area { flex: 1; min-width: 0; min-height: 0; padding: 34px 36px 48px; overflow: auto; overscroll-behavior: contain; }
 .page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
 .eyebrow { margin: 0 0 8px; color: #6c8fd4; font-size: 11px; font-weight: 700; letter-spacing: .14em; }
 h1 { margin: 0; color: #172033; font-size: 28px; line-height: 1.2; }
