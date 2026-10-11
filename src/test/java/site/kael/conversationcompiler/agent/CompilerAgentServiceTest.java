@@ -38,11 +38,10 @@ class CompilerAgentServiceTest {
         when(client.prompt()).thenReturn(request);
         when(request.system(anyString())).thenReturn(request);
         when(request.user(anyString())).thenReturn(request);
-        when(request.toolCallbacks(anyList())).thenReturn(request);
         when(response.content()).thenReturn("");
 
         var capturedTools = new AtomicReference<List<ToolCallback>>();
-        when(request.toolCallbacks(anyList())).thenAnswer(invocation -> {
+        when(request.tools(anyList())).thenAnswer(invocation -> {
             capturedTools.set(invocation.getArgument(0));
             return request;
         });

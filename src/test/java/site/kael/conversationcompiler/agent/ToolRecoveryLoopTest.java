@@ -45,7 +45,7 @@ class ToolRecoveryLoopTest {
             return new ChatResponse(List.of(new Generation(new AssistantMessage("model saw the failures"))));
         });
         var observer = new ToolCallRecoveryTest.TraceObserver();
-        String result = client(model).prompt().user("compile").toolCallbacks(List.of(
+        String result = client(model).prompt().user("compile").tools(List.of(
                 ToolCallRecovery.wrap(badTool, observer), ToolCallRecovery.wrap(goodTool, observer))).call().content();
         assertThat(result).isEqualTo("model saw the failures");
         verify(model, times(2)).call(any(Prompt.class));
@@ -77,7 +77,7 @@ class ToolRecoveryLoopTest {
             };
             return toolResponse(List.of(call("report-" + current, "compile_result", input)));
         });
-        String result = client(model).prompt().user("compile").toolCallbacks(List.of(
+        String result = client(model).prompt().user("compile").tools(List.of(
                 ToolCallRecovery.wrap(report, new ToolCallRecoveryTest.TraceObserver()))).call().content();
         assertThat(mapper.readTree(result).asText()).isEqualTo("compile_result accepted");
         assertThat(collector.get().summary()).isEqualTo("done");
@@ -115,7 +115,7 @@ class ToolRecoveryLoopTest {
             return new ChatResponse(List.of(new Generation(new AssistantMessage("done"))));
         });
         var observer = new ToolCallRecoveryTest.TraceObserver();
-        assertThat(client(model).prompt().user("compile").toolCallbacks(List.of(ToolCallRecovery.wrap(write, observer))).call().content())
+        assertThat(client(model).prompt().user("compile").tools(List.of(ToolCallRecovery.wrap(write, observer))).call().content())
                 .isEqualTo("done");
         assertThat(observer.messages).filteredOn(trace -> trace.type().equals("knowledge_write")).hasSize(3);
         assertThat(observer.finished).extracting(ToolCallRecoveryTest.Trace::status)

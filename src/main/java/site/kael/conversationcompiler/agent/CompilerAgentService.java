@@ -112,7 +112,7 @@ public class CompilerAgentService {
                     ConversationTranscriptFormatter.format(events, Math.max(1, maxTranscriptChars)));
             observer.trace("message", "system", "系统提示词", system);
             observer.trace("message", "user", "整理输入", user);
-            chatClient.prompt().system(system).user(user).toolCallbacks(tools).call().content();
+            chatClient.prompt().system(system).user(user).tools(tools).call().content();
             CompileResultRequest result = collector.get();
             if (result == null) throw new IllegalStateException("compiler agent did not call compile_result");
             return result;

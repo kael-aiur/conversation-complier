@@ -173,6 +173,8 @@ mvn test
 
 当前测试覆盖 Controller、Service、Manager、Repository、SQLite 持久化、健康检查和 agent-trace 鉴权。
 
+编译默认显示弃用及待移除 API 警告，并通过 `-Werror` 将编译警告视为错误；应使用替代 API，而不是添加弃用警告抑制。测试 JVM 在启动时显式加载 Mockito agent，避免运行时动态附加；仅测试 JVM 关闭 CDS，不影响生产运行参数。
+
 ## 设计方向
 
 ```text
