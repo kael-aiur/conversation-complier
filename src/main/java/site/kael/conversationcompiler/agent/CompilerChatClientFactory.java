@@ -44,7 +44,8 @@ public class CompilerChatClientFactory {
         }
         // Keep the full tool-call exchange for the duration of this single agent run.
         // OpenAI-compatible APIs require each tool result to follow its assistant tool_calls message.
-        var builder = ChatClient.builder(model).defaultAdvisors(toolCallingAdvisor());
+        var observer = traceAdvisor instanceof CompileRunTraceAdvisor trace ? trace.observer() : null;
+        var builder = ChatClient.builder(model).defaultAdvisors(toolCallingAdvisor(observer));
         if (traceAdvisor != null) builder.defaultAdvisors(traceAdvisor);
         return builder.build();
     }
@@ -53,7 +54,16 @@ public class CompilerChatClientFactory {
     }
 
     static ToolCallingAdvisor toolCallingAdvisor() {
-        return ToolCallingAdvisor.builder().conversationHistoryEnabled(true).build();
+        return toolCallingAdvisor(null);
+    }
+
+    private static ToolCallingAdvisor toolCallingAdvisor(ModelFailoverRunner.AttemptObserver observer) {
+        if (observer == null) observer = new ModelFailoverRunner.AttemptObserver() {
+            public void started(String candidate, int attempt) { }
+            public void finished(String candidate, int attempt, String status, Throwable error) { }
+        };
+        return ToolCallingAdvisor.builder().conversationHistoryEnabled(true)
+                .toolCallingManager(new RecoveringToolCallingManager(observer)).build();
     }
 
     private Proxy proxy() {

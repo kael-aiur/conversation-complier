@@ -57,6 +57,8 @@ const providerForm = ref(createProviderForm())
 const compileSessionFilter = ref('')
 const activeTraceEntry = computed(() => selectedCompileRun.value?.trace?.slice().reverse().find((entry) => entry.status === 'running'))
 
+const returnedKnowledgeWrites = computed(() => selectedCompileRun.value?.trace?.filter((entry) => entry.eventType === 'knowledge_write' && entry.status === 'completed').length || 0)
+
 const providers = ref([])
 
 function createProviderForm() {
@@ -788,6 +790,9 @@ function eventIcon(type) {
             </article>
           </div>
         </section>
+        <el-alert v-if="returnedKnowledgeWrites" type="warning" :closable="false" show-icon
+          :title="`已有 ${returnedKnowledgeWrites} 次知识库写入工具返回响应（含历史尝试）`"
+          description="请查看执行过程中的独立写入响应核对远端结果。任务失败或已上报条目为 0，不代表知识库没有变化；重试前先核对，避免重复覆盖。" />
         <section v-if="selectedCompileRun.status === 'failed'" class="compile-failure-section">
           <div class="failure-panel-header">
             <div class="failure-heading"><el-icon><WarningFilled /></el-icon><strong>失败原因</strong></div>
@@ -817,7 +822,7 @@ function eventIcon(type) {
         </section>
         <section class="result-section">
           <div class="result-section-title"><span class="result-icon result-icon--knowledge">✓</span><strong>识别出的知识条目</strong><span class="result-count">{{ selectedCompileRun.knowledge.length }}</span></div>
-          <el-empty v-if="selectedCompileRun.knowledge.length === 0" description="本次未生成知识条目" />
+          <el-empty v-if="selectedCompileRun.knowledge.length === 0" :description="returnedKnowledgeWrites ? '尚未上报知识条目；已有写入工具响应，请核对执行过程' : '本次未上报知识条目'" />
           <ul v-else class="knowledge-result-list"><li v-for="item in selectedCompileRun.knowledge" :key="item"><span class="knowledge-bullet">•</span>{{ item }}</li></ul>
         </section>
         </template>
