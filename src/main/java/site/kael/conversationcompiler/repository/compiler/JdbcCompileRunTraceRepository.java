@@ -9,7 +9,6 @@ import java.util.List;
 
 @Repository
 public class JdbcCompileRunTraceRepository implements CompileRunTraceRepository {
-    private static final int MAX_CONTENT_CHARS = 12_000;
     private final JdbcTemplate jdbc;
     public JdbcCompileRunTraceRepository(JdbcTemplate jdbc) { this.jdbc = jdbc; }
 
@@ -38,7 +37,7 @@ public class JdbcCompileRunTraceRepository implements CompileRunTraceRepository 
     private String sanitize(String value) {
         String safe = FailureMessageSanitizer.sanitize(value == null ? "" : value);
         if (safe.length() <= MAX_CONTENT_CHARS) return safe;
-        return safe.substring(0, MAX_CONTENT_CHARS) + "\n…（内容过长，已截断）";
+        return safe.substring(0, MAX_CONTENT_CHARS) + "\n…（内容过长，已截断；脱敏后原始长度 " + safe.length() + " 字符，保留 " + MAX_CONTENT_CHARS + " 字符）";
     }
 
     private Long nullableLong(Object value) { return value == null ? null : ((Number) value).longValue(); }

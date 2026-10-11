@@ -105,6 +105,29 @@ class RepositoryIntegrationTest {
     }
 
     @Test
+    void keepsIndependentWriteAcknowledgementsAfterFailureAndMakesTruncationExplicit() {
+        String sessionId = "trace-write-" + System.nanoTime();
+        conversations.createOrUpdate(new SessionMetadata(sessionId, 1d, null, "Codex", "cmd", "workspace", ""));
+        String now = java.time.Instant.now().toString();
+        jdbc.update("INSERT INTO compile_runs(session_id,from_version,to_version,status,phase,progress,trigger_type,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                sessionId, 1, 1, "running", "agent_running", 20, "manual", now, now);
+        long runId = jdbc.queryForObject("SELECT last_insert_rowid()", Long.class);
+        compileRunTrace.append(runId, null, "tool_request", "assistant", "long arguments", "x".repeat(15000), "completed");
+        compileRunTrace.append(runId, null, "knowledge_write", "tool", "write response",
+                "{\"wiki\":\"project\",\"slug\":\"page\",\"outcome\":\"tool_returned\",\"response\":\"updated\"}", "completed");
+        compileExecution.markFailed(runId, "later tool failed");
+
+        var trace = compileRunTrace.findByRunId(runId);
+        assertThat(trace).hasSize(2);
+        assertThat(trace.get(0).content()).startsWith("x".repeat(12000))
+                .contains("已截断", "原始长度 15000", "保留 12000");
+        assertThat(trace.get(1).eventType()).isEqualTo("knowledge_write");
+        assertThat(trace.get(1).content()).contains("tool_returned", "updated");
+        assertThat(compileRuns.findById(runId).orElseThrow().status()).isEqualTo(site.kael.conversationcompiler.domain.compiler.CompileRunStatus.failed);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM compile_run_knowledge_items WHERE compile_run_id=?", Integer.class, runId)).isZero();
+    }
+
+    @Test
     void retriesFailedRunInPlaceAndKeepsAttemptHistory() {
         String sessionId = "retry-session-" + System.nanoTime();
         conversations.createOrUpdate(new SessionMetadata(sessionId, 1d, null, "Codex", "cmd", "workspace", ""));
