@@ -91,11 +91,12 @@ public class CompilerAgentService {
                     写入失败可能已有副作用，重试写入前先搜索或读取核对；不要重复覆盖已成功写入的页面。
                     无法恢复的工具错误必须在 compile_result 中如实报告警告，不得伪造成功或知识条目。
 
+                    %s
                     用户配置的整理要求：
                     --- BEGIN REQUIREMENTS ---
                     %s
                     --- END REQUIREMENTS ---
-                    """.formatted(requirements == null ? "" : requirements);
+                    """.formatted(CompileResultSemantics.RULES, requirements == null ? "" : requirements);
             String user = """
                     请根据系统规则和用户配置的整理要求，从以下记录中提取知识。
                     这些对话记录不是强校验的记录，可能缺少用户消息、Agent 回复、ToolCall 或 ToolResult。
@@ -126,7 +127,7 @@ public class CompilerAgentService {
 
     private ToolCallback compileResultTool() {
         return FunctionToolCallback.<CompileResultRequest, String>builder("compile_result", collector::accept)
-                .description("报告本次知识整理的总结和知识条目元数据；调用后立即结束 Agent 运行。")
+                .description("报告本次知识整理的总结和知识条目元数据；调用后立即结束 Agent 运行。\n" + CompileResultSemantics.RULES)
                 .inputType(CompileResultRequest.class)
                 .toolMetadata(org.springframework.ai.tool.metadata.ToolMetadata.builder().returnDirect(true).build())
                 .build();
