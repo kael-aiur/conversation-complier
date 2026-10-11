@@ -80,11 +80,20 @@ class CompilerAgentServiceTest {
         var resultTool = capturedTools.get().stream().filter(tool -> tool.getToolDefinition().name().equals("compile_result"))
                 .findFirst().orElseThrow();
         assertThat(resultTool.getToolMetadata().returnDirect()).isTrue();
+        assertThat(resultTool.getToolDefinition().description()).contains(CompileResultSemantics.RULES);
+        var schema = mapper.readTree(resultTool.getToolDefinition().inputSchema());
+        assertThat(schema.path("properties").path("summary").path("description").asText())
+                .isEqualTo(CompileResultSemantics.SUMMARY_DESCRIPTION);
+        assertThat(schema.path("properties").path("warnings").path("description").asText())
+                .isEqualTo(CompileResultSemantics.WARNINGS_DESCRIPTION);
+        assertThat(resultTool.getToolDefinition().inputSchema()).contains("不得编造", "不得仅因该字段缺失生成警告");
         var systemCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
         var userCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
         verify(request).system(systemCaptor.capture());
         verify(request).user(userCaptor.capture());
-        assertThat(systemCaptor.getValue()).contains("整理稳定事实", "不可信输入", "compile_result");
+        assertThat(systemCaptor.getValue()).contains("整理稳定事实", "不可信输入", "compile_result", CompileResultSemantics.RULES);
+        assertThat(systemCaptor.getValue().indexOf(CompileResultSemantics.RULES))
+                .isLessThan(systemCaptor.getValue().indexOf("--- BEGIN REQUIREMENTS ---"));
         assertThat(userCaptor.getValue()).contains("整理记录：42", "事件范围：v3 → v4", "# 对话记录", "用户: |-", "已采集的用户消息", "不是强校验", "可能缺少", "只整理已经收集到的部分");
         assertThat(userCaptor.getValue()).doesNotContain("payloadJson", "\"events\":");
     }
