@@ -1,6 +1,11 @@
 package site.kael.conversationcompiler.repository.compiler;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import site.kael.conversationcompiler.common.FailureMessageSanitizer;
 import org.springframework.stereotype.Repository;
 import site.kael.conversationcompiler.domain.compiler.*;
 
@@ -11,8 +16,13 @@ import java.util.Optional;
 
 @Repository
 public class JdbcCompileRunRepository implements CompileRunRepository {
+    private static final Logger log = LoggerFactory.getLogger(JdbcCompileRunRepository.class);
     private final JdbcTemplate jdbc;
-    public JdbcCompileRunRepository(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    private final ObjectMapper json;
+    public JdbcCompileRunRepository(JdbcTemplate jdbc, ObjectMapper json) {
+        this.jdbc = jdbc;
+        this.json = json;
+    }
 
     @Override
     public List<CompileRun> findAll(String sessionId, String status, int limit, int offset) {
@@ -117,8 +127,29 @@ public class JdbcCompileRunRepository implements CompileRunRepository {
                     r.getString("phase"), r.getInt("progress"), CompileTriggerType.valueOf(r.getString("trigger_type")),
                     r.getString("summary"), nullableLong(r, "knowledge_count"), r.getString("queued_at"), started,
                     finished, duration, site.kael.conversationcompiler.common.FailureMessageSanitizer.sanitize(r.getString("error_message")), r.getString("compiler_version"),
-                    r.getString("created_at"), r.getString("updated_at"));
+                    r.getString("created_at"), r.getString("updated_at"), readWarnings(r.getLong("id"), r.getString("result_json")));
         };
     }
+    /** Expose only warnings, never the full result JSON; preserve order, blanks and duplicates. */
+    private List<String> readWarnings(long runId, String resultJson) {
+        if (resultJson == null || resultJson.isBlank()) return List.of();
+        try {
+            var result = json.readTree(resultJson);
+            var warnings = result == null ? null : result.get("warnings");
+            if (warnings == null || warnings.isNull()) return List.of();
+            if (!warnings.isArray()) throw new IllegalArgumentException("warnings is not an array");
+            List<String> values = new java.util.ArrayList<>();
+            for (var warning : warnings) {
+                if (!warning.isTextual()) throw new IllegalArgumentException("warning is not text");
+                values.add(FailureMessageSanitizer.sanitize(warning.asText()));
+            }
+            return List.copyOf(values);
+        } catch (JsonProcessingException | IllegalArgumentException error) {
+            // Historical malformed results must not break list/detail requests or leak their contents.
+            log.warn("Could not read warning details for compile run {} ({})", runId, error.getClass().getSimpleName());
+            return List.of();
+        }
+    }
+
     private long nullableLong(java.sql.ResultSet r, String column) throws java.sql.SQLException { Number value = (Number) r.getObject(column); return value == null ? 0 : value.longValue(); }
 }

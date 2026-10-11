@@ -60,6 +60,6 @@ class CompileRunServiceTest {
 
     private CompileRun run(long id, CompileRunStatus status) {
         return new CompileRun(id, "session", "title", 1, 3, 0, 0, 3, status, "failed", 0,
-                CompileTriggerType.manual, null, 0, null, null, null, 0, "previous error", "mvp", "", "");
+                CompileTriggerType.manual, null, 0, null, null, null, 0, "previous error", "mvp", "", "", java.util.List.of());
     }
 }

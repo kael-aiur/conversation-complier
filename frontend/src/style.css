@@ -223,6 +223,15 @@ h1 { margin: 0; color: #172033; font-size: 28px; line-height: 1.2; }
 .selected-model-name { flex: 1; min-width: 0; overflow: hidden; color: var(--text-primary); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .settings-form--readonly .selected-model-row { background: #fff; }
 
+.compile-warning-section { margin: 20px 0; padding: 14px 16px; border: 1px solid #f0d6a4; border-radius: 10px; background: #fffaf0; }
+.compile-warning-heading { display: flex; align-items: center; gap: 8px; color: #946200; font-size: 14px; }
+.compile-warning-description { margin: 10px 0; color: #8a744a; font-size: 12px; line-height: 1.6; }
+.compile-warning-list { margin: 10px 0 0; padding-left: 22px; }
+.compile-warning-list li { padding-left: 4px; color: #805c20; }
+.compile-warning-list li + li { margin-top: 10px; }
+.compile-warning-list li::marker { font-size: 13px; font-weight: 600; }
+.compile-warning-content { margin: 0; color: #805c20; font-size: 13px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+
 .compile-failure-section { margin: 20px 0; padding: 14px 16px; border: 1px solid #f2caca; border-radius: 10px; background: #fff8f8; }
 .failure-heading { display: flex; align-items: center; gap: 8px; color: #b42318; font-size: 14px; }
 .failure-message { margin: 10px 0 0; color: #7d3434; font-family: inherit; font-size: 13px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
