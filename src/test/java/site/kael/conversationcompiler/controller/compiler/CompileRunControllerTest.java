@@ -5,6 +5,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import site.kael.conversationcompiler.controller.ApiExceptionHandler;
 import site.kael.conversationcompiler.domain.compiler.CompileRunAttempt;
+import site.kael.conversationcompiler.domain.compiler.CompileRun;
+import site.kael.conversationcompiler.domain.compiler.CompileRunStatus;
+import site.kael.conversationcompiler.domain.compiler.CompileTriggerType;
 import site.kael.conversationcompiler.domain.compiler.CompileRunTraceEntry;
 import site.kael.conversationcompiler.service.compiler.CompileRunService;
 
@@ -45,6 +48,38 @@ class CompileRunControllerTest {
                 .andExpect(jsonPath("$[0].eventType").value("model_call"))
                 .andExpect(jsonPath("$[0].status").value("running"));
         verify(service).trace(42);
+    }
+
+    @Test
+    void exposesWarningDetailsWithoutExposingTheFullStoredResult() throws Exception {
+        var run = run(CompileRunStatus.completed_with_warnings, List.of("未返回内容哈希", "只整理已有证据"));
+        when(service.get(42)).thenReturn(run);
+        when(service.list(null, null, 50, 0)).thenReturn(List.of(run));
+        mvc.perform(get("/api/v1/compile-runs/42"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("completed_with_warnings"))
+                .andExpect(jsonPath("$.warnings[0]").value("未返回内容哈希"))
+                .andExpect(jsonPath("$.warnings[1]").value("只整理已有证据"))
+                .andExpect(jsonPath("$.resultJson").doesNotExist())
+                .andExpect(jsonPath("$.result_json").doesNotExist());
+        mvc.perform(get("/api/v1/compile-runs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].warnings[0]").value("未返回内容哈希"));
+    }
+
+    @Test
+    void exposesAnEmptyArrayForRunsWithoutWarningDetails() throws Exception {
+        when(service.get(42)).thenReturn(run(CompileRunStatus.completed, null));
+        mvc.perform(get("/api/v1/compile-runs/42"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("completed"))
+                .andExpect(jsonPath("$.warnings").isArray())
+                .andExpect(jsonPath("$.warnings").isEmpty());
+    }
+
+    private CompileRun run(CompileRunStatus status, List<String> warnings) {
+        return new CompileRun(42, "session", "title", 1, 3, 0, 0, 3, status, "completed", 100,
+                CompileTriggerType.manual, "done", 1, null, null, null, 0, null, "mvp", "", "", warnings);
     }
 
     @Test

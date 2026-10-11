@@ -204,6 +204,7 @@ function normalizeCompileRun(run) {
     ...run,
     sessionTitle: run.sessionTitle || run.sessionId,
     knowledgeCount: run.knowledgeCount || 0,
+    warnings: Array.isArray(run.warnings) ? run.warnings : [],
     startedAt: formatUpdatedAt(run.startedAt),
     duration: run.durationSeconds ? `${Math.floor(run.durationSeconds / 60)} 分 ${run.durationSeconds % 60} 秒` : (run.status === 'running' ? '进行中' : '暂无'),
     knowledge: [],
@@ -319,11 +320,11 @@ function statusType(status) {
 }
 
 function compileStatusLabel(status) {
-  return { completed: '已完成', running: '整理中', failed: '失败' }[status] || status
+  return { completed: '已完成', completed_with_warnings: '已完成（有警告）', running: '整理中', failed: '失败' }[status] || status
 }
 
 function compileStatusType(status) {
-  return { completed: 'success', running: 'primary', failed: 'danger' }[status] || 'info'
+  return { completed: 'success', completed_with_warnings: 'warning', running: 'primary', failed: 'danger' }[status] || 'info'
 }
 
 function attemptStatusLabel(status) {
@@ -773,6 +774,18 @@ function eventIcon(type) {
           <div><span>耗时</span><strong>{{ selectedCompileRun.duration }}</strong></div>
           <div><span>生成条目</span><strong>{{ selectedCompileRun.knowledgeCount }}</strong></div>
         </div>
+        <section v-if="selectedCompileRun.warnings.length || selectedCompileRun.status === 'completed_with_warnings'"
+          class="compile-warning-section" role="region" aria-label="整理警告">
+          <div class="compile-warning-heading"><el-icon><WarningFilled /></el-icon><strong>整理警告</strong><span v-if="selectedCompileRun.warnings.length" class="result-count">{{ selectedCompileRun.warnings.length }}</span></div>
+          <p class="compile-warning-description">以下为本次整理上报的警告内容，敏感凭据已脱敏。</p>
+          <ol v-if="selectedCompileRun.warnings.length" class="compile-warning-list">
+            <li v-for="(warning, index) in selectedCompileRun.warnings" :key="index">
+              <p class="compile-warning-content">{{ typeof warning === 'string' && warning.trim() ? warning : '（空白或非文本警告内容）' }}</p>
+            </li>
+          </ol>
+          <el-alert v-else title="该记录标记为带警告完成，但未获取到可展示的警告明细。"
+            description="历史结果可能缺失或无法解析，请结合执行过程核对。" type="info" :closable="false" show-icon />
+        </section>
         <section class="compile-trace-section">
           <div class="result-section-title"><span class="result-icon result-icon--attempt">⌁</span><strong>执行过程</strong><span class="result-count">{{ selectedCompileRun.trace?.length || 0 }}</span><el-tag v-if="['pending','running'].includes(selectedCompileRun.status)" type="primary" effect="light" round size="small">实时更新</el-tag></div>
           <div v-if="['pending','running'].includes(selectedCompileRun.status)" class="compile-trace-live">

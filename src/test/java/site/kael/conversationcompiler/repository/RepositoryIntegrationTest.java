@@ -1,6 +1,9 @@
 package site.kael.conversationcompiler.repository;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -125,6 +128,55 @@ class RepositoryIntegrationTest {
         assertThat(trace.get(1).content()).contains("tool_returned", "updated");
         assertThat(compileRuns.findById(runId).orElseThrow().status()).isEqualTo(site.kael.conversationcompiler.domain.compiler.CompileRunStatus.failed);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM compile_run_knowledge_items WHERE compile_run_id=?", Integer.class, runId)).isZero();
+    }
+
+    @Test
+    void exposesHistoricalWarningsInOrderWithRedactionWithoutRewritingTheStoredResult() {
+        long id = createWarningRun();
+        var result = new CompileResultRequest("done", java.util.List.of(), java.util.List.of(
+                "写入工具没有返回内容哈希。", "Authorization: Bearer demo-token x-mcp-key: demo-key", "", "重复说明", "重复说明"));
+        assertThat(compileExecution.markCompleted(id, result)).isTrue();
+        String stored = jdbc.queryForObject("SELECT result_json FROM compile_runs WHERE id=?", String.class, id);
+
+        var detail = compileRuns.findById(id).orElseThrow();
+        assertThat(detail.status()).isEqualTo(site.kael.conversationcompiler.domain.compiler.CompileRunStatus.completed_with_warnings);
+        assertThat(detail.warnings()).containsExactly("写入工具没有返回内容哈希。",
+                "Authorization: Bearer [redacted] x-mcp-key: [redacted]", "", "重复说明", "重复说明");
+        assertThat(compileRuns.findAll(detail.sessionId(), null, 10, 0).getFirst().warnings()).isEqualTo(detail.warnings());
+        assertThat(jdbc.queryForObject("SELECT result_json FROM compile_runs WHERE id=?", String.class, id)).isEqualTo(stored);
+        assertThat(stored).contains("demo-token", "demo-key"); // Read-time redaction, no historical mutation.
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"{}", "null", "{\"warnings\":null}", "{\"warnings\":[]}",
+            "{\"warnings\":[\"unfinished", "{\"warnings\":\"not an array\"}", "{\"warnings\":[42]}"})
+    void missingOrMalformedHistoricalWarningsDoNotBreakQueriesOrChangeStatus(String stored) {
+        long id = createWarningRun();
+        jdbc.update("UPDATE compile_runs SET status='completed_with_warnings',result_json=? WHERE id=?", stored, id);
+        var detail = compileRuns.findById(id).orElseThrow();
+        assertThat(detail.warnings()).isEmpty();
+        assertThat(detail.status()).isEqualTo(site.kael.conversationcompiler.domain.compiler.CompileRunStatus.completed_with_warnings);
+        assertThat(compileRuns.findAll(detail.sessionId(), null, 10, 0).getFirst().warnings()).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT result_json FROM compile_runs WHERE id=?", String.class, id)).isEqualTo(stored);
+    }
+
+    @Test
+    void normallyCompletedRunsExposeAnEmptyWarningsArray() {
+        long id = createWarningRun();
+        assertThat(compileExecution.markCompleted(id, new CompileResultRequest("done", java.util.List.of(), java.util.List.of()))).isTrue();
+        var detail = compileRuns.findById(id).orElseThrow();
+        assertThat(detail.status()).isEqualTo(site.kael.conversationcompiler.domain.compiler.CompileRunStatus.completed);
+        assertThat(detail.warnings()).isEmpty();
+    }
+
+    private long createWarningRun() {
+        String sessionId = "warnings-" + System.nanoTime();
+        conversations.createOrUpdate(new SessionMetadata(sessionId, 1d, null, "Codex", "cmd", "workspace", ""));
+        long id = compileRuns.createPending(sessionId, 1, 1, 0, 0, 1,
+                site.kael.conversationcompiler.domain.compiler.CompileTriggerType.manual);
+        assertThat(compileExecution.markRunning(id, "agent_running", "provider", "model", "prompt")).isTrue();
+        return id;
     }
 
     @Test

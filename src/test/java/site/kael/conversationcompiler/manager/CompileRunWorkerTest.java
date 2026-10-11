@@ -22,7 +22,7 @@ class CompileRunWorkerTest {
 
     @Test void completesRunAndAdvancesVersion() {
         var runs=mock(CompileRunRepository.class); var execution=mock(CompileRunExecutionRepository.class); var events=mock(EventRepository.class); var settings=mock(KnowledgeSettingsRepository.class); var agent=mock(CompilerAgentService.class);
-        var run=new CompileRun(1,"s","title",1,2,0,0,2,CompileRunStatus.pending,"queued",0,CompileTriggerType.manual,null,0,null,null,null,0,null,"mvp","","");
+        var run=new CompileRun(1,"s","title",1,2,0,0,2,CompileRunStatus.pending,"queued",0,CompileTriggerType.manual,null,0,null,null,null,0,null,"mvp","","",java.util.List.of());
         when(runs.findById(1)).thenReturn(Optional.of(run)); when(settings.find()).thenReturn(Optional.of(new KnowledgeCompileSettings("p","P","m",1,"prompt",true,""))); when(events.findBySessionIdAndVersionRange(anyString(),anyLong(),anyLong())).thenReturn(List.of(new ConversationEvent(1,"s","e1","user_prompt",1,"now","{}"),new ConversationEvent(2,"s","e2","assistant_response",2,"now","{}")));
         when(runs.truncatePendingRun(anyLong(), anyLong(), anyLong(), anyLong())).thenReturn(true); when(agent.compile(anyLong(),anyString(),anyString(),anyString(),anyString(),anyLong(),anyLong(),anyList(),any())).thenReturn(new CompileResultRequest("summary",List.of(),List.of()));
         when(execution.markRunning(anyLong(), anyString(), anyString(), anyString(), anyString())).thenReturn(true);
@@ -33,7 +33,7 @@ class CompileRunWorkerTest {
     }
     @Test void warningsCompleteWithWarningsAndStillAdvanceVersion() {
         var runs=mock(CompileRunRepository.class); var execution=mock(CompileRunExecutionRepository.class); var events=mock(EventRepository.class); var settings=mock(KnowledgeSettingsRepository.class); var agent=mock(CompilerAgentService.class);
-        var run=new CompileRun(1,"s","title",1,2,0,0,2,CompileRunStatus.pending,"queued",0,CompileTriggerType.manual,null,0,null,null,null,0,null,"mvp","","");
+        var run=new CompileRun(1,"s","title",1,2,0,0,2,CompileRunStatus.pending,"queued",0,CompileTriggerType.manual,null,0,null,null,null,0,null,"mvp","","",java.util.List.of());
         when(runs.findById(1)).thenReturn(Optional.of(run));
         when(settings.find()).thenReturn(Optional.of(new KnowledgeCompileSettings("p","P","m",1,"prompt",true,"")));
         when(events.findBySessionIdAndVersionRange(anyString(),anyLong(),anyLong())).thenReturn(List.of(new ConversationEvent(1,"s","e1","user_prompt",1,"now","{}"),new ConversationEvent(2,"s","e2","assistant_response",2,"now","{}")));
@@ -50,7 +50,7 @@ class CompileRunWorkerTest {
     @Test void incompleteInputReachesAgentAndOnlySelectedBatchAdvancesVersion() {
         var runs=mock(CompileRunRepository.class); var execution=mock(CompileRunExecutionRepository.class);
         var events=mock(EventRepository.class); var settings=mock(KnowledgeSettingsRepository.class); var agent=mock(CompilerAgentService.class);
-        var run=new CompileRun(1,"s","title",10,51,0,0,42,CompileRunStatus.pending,"queued",0,CompileTriggerType.manual,null,0,null,null,null,0,null,"mvp","","");
+        var run=new CompileRun(1,"s","title",10,51,0,0,42,CompileRunStatus.pending,"queued",0,CompileTriggerType.manual,null,0,null,null,null,0,null,"mvp","","",java.util.List.of());
         var source=new ArrayList<ConversationEvent>();
         for(int i=0;i<21;i++) {
             source.add(new ConversationEvent(i*2+1,"s","u"+i,"user_prompt",1,"now","{}"));
@@ -73,7 +73,7 @@ class CompileRunWorkerTest {
 
     @Test void failureDoesNotAdvanceVersion() {
         var runs=mock(CompileRunRepository.class); var execution=mock(CompileRunExecutionRepository.class); var events=mock(EventRepository.class); var settings=mock(KnowledgeSettingsRepository.class); var agent=mock(CompilerAgentService.class);
-        var run=new CompileRun(1,"s","title",1,2,0,0,2,CompileRunStatus.pending,"queued",0,CompileTriggerType.manual,null,0,null,null,null,0,null,"mvp","","");
+        var run=new CompileRun(1,"s","title",1,2,0,0,2,CompileRunStatus.pending,"queued",0,CompileTriggerType.manual,null,0,null,null,null,0,null,"mvp","","",java.util.List.of());
         when(runs.findById(1)).thenReturn(Optional.of(run)); when(settings.find()).thenReturn(Optional.of(new KnowledgeCompileSettings("p","P","m",1,"prompt",true,""))); when(events.findBySessionIdAndVersionRange(anyString(),anyLong(),anyLong())).thenReturn(List.of(new ConversationEvent(1,"s","e1","user_prompt",1,"now","{}"),new ConversationEvent(2,"s","e2","assistant_response",2,"now","{}")));
         when(runs.truncatePendingRun(anyLong(), anyLong(), anyLong(), anyLong())).thenReturn(true); when(agent.compile(anyLong(),anyString(),anyString(),anyString(),anyString(),anyLong(),anyLong(),anyList(),any())).thenThrow(new RuntimeException("429"));
         when(execution.markRunning(anyLong(), anyString(), anyString(), anyString(), anyString())).thenReturn(true);
