@@ -21,7 +21,38 @@ import {
   WarningFilled,
 } from '@element-plus/icons-vue'
 
-const isCollapsed = ref(false)
+// Shared layout contract: compact <768, medium <1200, desktop otherwise.
+const compactMedia = window.matchMedia('(max-width: 767px)')
+const mediumMedia = window.matchMedia('(max-width: 1199px)')
+const viewportMode = ref(readViewportMode())
+const mobileNavOpen = ref(false)
+const sidebarToggle = ref(null)
+const desktopCollapsed = ref(null) // null: follow mode defaults until the user chooses
+const isCompact = computed(() => viewportMode.value === 'compact')
+const isCollapsed = computed(() => desktopCollapsed.value ?? viewportMode.value === 'medium')
+const sidebarWidth = computed(() => isCompact.value ? '0px' : isCollapsed.value ? '72px' : '240px')
+const navigationItems = [
+  { index: 'sessions', title: '会话列表', icon: ChatDotRound },
+  { index: 'compile-runs', title: '整理记录', icon: Tickets },
+  { index: 'settings', title: '知识整理设置', icon: Setting },
+]
+
+function readViewportMode() {
+  return compactMedia.matches ? 'compact' : mediumMedia.matches ? 'medium' : 'desktop'
+}
+
+function syncViewportMode() {
+  viewportMode.value = readViewportMode()
+  if (viewportMode.value !== 'compact') mobileNavOpen.value = false
+}
+
+async function restoreNavigationFocus() {
+  // A business drawer must retain its own focus trap when replacing navigation.
+  await nextTick()
+  if (!drawerVisible.value && !compileDrawerVisible.value && !providerDrawerVisible.value) {
+    sidebarToggle.value?.$el?.focus()
+  }
+}
 const activeMenu = ref('sessions')
 const contentArea = ref(null)
 const apiStatus = ref('未检查')
@@ -213,6 +244,7 @@ function normalizeCompileRun(run) {
 }
 
 async function openSession(row) {
+  mobileNavOpen.value = false
   selectedSession.value = row
   selectedEvents.value = []
   drawerVisible.value = true
@@ -297,10 +329,20 @@ function formatUpdatedAt(value) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-onMounted(() => { loadSessions(); loadCompileRuns(); loadProviders(); loadKnowledgeSettings() })
-onUnmounted(stopCompileRunPolling)
+onMounted(() => {
+  compactMedia.addEventListener('change', syncViewportMode)
+  mediumMedia.addEventListener('change', syncViewportMode)
+  syncViewportMode()
+  loadSessions(); loadCompileRuns(); loadProviders(); loadKnowledgeSettings()
+})
+onUnmounted(() => {
+  compactMedia.removeEventListener('change', syncViewportMode)
+  mediumMedia.removeEventListener('change', syncViewportMode)
+  stopCompileRunPolling()
+})
 
 async function selectMenu(menu) {
+  mobileNavOpen.value = false
   activeMenu.value = menu
   await nextTick()
   const element = contentArea.value?.$el
@@ -308,7 +350,13 @@ async function selectMenu(menu) {
 }
 
 function toggleSidebar() {
-  isCollapsed.value = !isCollapsed.value
+  if (isCompact.value) {
+    if (!drawerVisible.value && !compileDrawerVisible.value && !providerDrawerVisible.value) {
+      mobileNavOpen.value = !mobileNavOpen.value
+    }
+  } else {
+    desktopCollapsed.value = !isCollapsed.value
+  }
 }
 
 function statusLabel(status) {
@@ -336,6 +384,7 @@ function attemptStatusType(status) {
 }
 
 function openProviderCreate() {
+  mobileNavOpen.value = false
   providerDrawerMode.value = 'create'
   providerDrawerError.value = ''
   providerModelsFetched.value = false
@@ -344,6 +393,7 @@ function openProviderCreate() {
 }
 
 function openProviderEdit(provider) {
+  mobileNavOpen.value = false
   providerDrawerMode.value = 'edit'
   providerDrawerError.value = ''
   providerModelsFetched.value = false
@@ -524,6 +574,7 @@ function stopCompileRunPolling() {
 }
 
 async function openCompileRun(run) {
+  mobileNavOpen.value = false
   stopCompileRunPolling()
   selectedCompileRun.value = { ...run, trace: [], knowledge: [], attempts: [] }
   compileDrawerVisible.value = true
@@ -550,25 +601,17 @@ function eventIcon(type) {
 </script>
 
 <template>
-  <el-container class="app-shell">
-    <el-aside :width="isCollapsed ? '72px' : '240px'" class="app-sidebar">
+  <el-container class="app-shell" :class="`app-shell--${viewportMode}`" :style="{ '--sidebar-width': sidebarWidth }">
+    <el-aside v-if="!isCompact" :width="sidebarWidth" class="app-sidebar" aria-label="主导航">
       <div class="brand" :class="{ 'brand--collapsed': isCollapsed }">
         <div class="brand-mark"><Connection :size="20" /></div>
         <div v-if="!isCollapsed" class="brand-copy"><strong>Conversation</strong><span>Compiler</span></div>
       </div>
 
       <el-menu :default-active="activeMenu" :collapse="isCollapsed" class="sidebar-menu" @select="selectMenu">
-        <el-menu-item index="sessions">
-          <el-icon><ChatDotRound /></el-icon>
-          <template #title>会话列表</template>
-        </el-menu-item>
-        <el-menu-item index="compile-runs">
-          <el-icon><Tickets /></el-icon>
-          <template #title>整理记录</template>
-        </el-menu-item>
-        <el-menu-item index="settings">
-          <el-icon><Setting /></el-icon>
-          <template #title>知识整理设置</template>
+        <el-menu-item v-for="item in navigationItems" :key="item.index" :index="item.index" :aria-current="activeMenu === item.index ? 'page' : undefined">
+          <el-icon><component :is="item.icon" /></el-icon>
+          <template #title>{{ item.title }}</template>
         </el-menu-item>
       </el-menu>
 
@@ -581,7 +624,7 @@ function eventIcon(type) {
     <el-container class="main-container">
       <el-header class="topbar">
         <div class="topbar-left">
-          <el-button text class="collapse-button" @click="toggleSidebar"><el-icon :size="20"><Fold v-if="!isCollapsed" /><MenuIcon v-else /></el-icon></el-button>
+          <el-button ref="sidebarToggle" text class="collapse-button" :aria-label="isCompact ? '打开主导航' : isCollapsed ? '展开侧栏' : '折叠侧栏'" :aria-expanded="isCompact ? mobileNavOpen : !isCollapsed" :aria-controls="isCompact ? 'mobile-navigation' : undefined" @click="toggleSidebar"><el-icon :size="20"><Fold v-if="!isCompact && !isCollapsed" /><MenuIcon v-else /></el-icon></el-button>
           <div class="breadcrumb"><span>控制台</span><span class="breadcrumb-separator">/</span><strong>{{ pageTitle }}</strong></div>
         </div>
         <div class="topbar-right">
@@ -727,6 +770,15 @@ function eventIcon(type) {
         <p class="api-status">后端状态：{{ apiStatus }} <span v-if="apiError" class="api-error">{{ apiError }}</span><span v-else class="mock-hint">数据来自后端 API</span></p>
       </el-main>
     </el-container>
+
+    <el-drawer v-model="mobileNavOpen" title="主导航" direction="ltr" size="min(280px, calc(100vw - 48px))" class="mobile-navigation" @closed="restoreNavigationFocus">
+      <el-menu id="mobile-navigation" :default-active="activeMenu" class="sidebar-menu" aria-label="主导航" @select="selectMenu">
+        <el-menu-item v-for="item in navigationItems" :key="item.index" :index="item.index" :aria-current="activeMenu === item.index ? 'page' : undefined">
+          <el-icon><component :is="item.icon" /></el-icon>
+          <template #title>{{ item.title }}</template>
+        </el-menu-item>
+      </el-menu>
+    </el-drawer>
 
     <el-drawer v-model="drawerVisible" :title="selectedSession?.title || '会话事件'" :size="isCollapsed ? 'calc(100vw - 72px)' : 'calc(100vw - 240px)'" direction="rtl" class="event-drawer">
       <template #header>
