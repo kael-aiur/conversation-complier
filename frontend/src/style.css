@@ -272,6 +272,15 @@ h1 { margin: 0; color: #172033; font-size: 28px; line-height: 1.2; }
 .mobile-navigation .el-drawer__body { display: flex; min-height: 0; padding: 12px 0; }
 .mobile-navigation .sidebar-menu { width: 100%; }
 
+/* Former 800px detail rules stay active throughout the shared non-desktop tier. */
+@media (max-width: 1199px) {
+  .compile-run-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cascading-model-select { align-items: stretch; flex-direction: column; }
+  .cascading-model-select .provider-select, .cascading-model-select .model-select { width: 100%; min-width: 0; }
+  .select-arrow { display: none; }
+  .provider-toolbar { align-items: flex-start; flex-direction: column; }
+}
+
 @media (min-width: 768px) and (max-width: 1199px) {
   .topbar { padding: 0 24px; }
   .content-area { padding: 28px 24px 40px; }
@@ -288,9 +297,4 @@ h1 { margin: 0; color: #172033; font-size: 28px; line-height: 1.2; }
   .page-heading { align-items: flex-start; flex-direction: column; }
   .card-header { align-items: flex-start; flex-direction: column; }
   .search-input, .session-filter { width: 100%; }
-  .compile-run-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .cascading-model-select { align-items: stretch; flex-direction: column; }
-  .cascading-model-select .provider-select, .cascading-model-select .model-select { width: 100%; min-width: 0; }
-  .select-arrow { display: none; }
-  .provider-toolbar { align-items: flex-start; flex-direction: column; }
 }
