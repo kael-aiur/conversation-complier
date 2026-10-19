@@ -373,3 +373,58 @@ h1 { margin: 0; color: #172033; font-size: 28px; line-height: 1.2; }
   .trace-entry-header { align-items: flex-start; flex-direction: column; }
   .compile-warning-section, .compile-failure-section, .compile-attempt-card { padding: 12px; }
 }
+
+/* T04: flow-based settings and provider inner form. Drawer shell/size stays T03's. */
+.settings-tab-header, .settings-tab-header > div, .settings-tab-actions,
+.settings-form, .settings-form .el-form-item__content,
+.provider-form, .provider-form .el-form-item__content { min-width: 0; max-width: 100%; }
+.settings-tab-header { flex-wrap: wrap; }
+.settings-tab-actions { flex-wrap: wrap; }
+.settings-tab-actions .el-button + .el-button { margin-left: 0; }
+.settings-form .el-textarea, .selected-model-order { width: 100%; }
+.selected-model-row { min-width: 0; flex-wrap: wrap; }
+.selected-model-index { flex: 0 0 22px; }
+.selected-model-name { overflow: visible; white-space: normal; overflow-wrap: anywhere; text-overflow: clip; }
+.selected-model-actions { display: flex; flex: 0 0 auto; flex-wrap: wrap; gap: 4px; }
+.selected-model-actions .el-button { min-width: 44px; min-height: 44px; margin-left: 0; }
+.interval-input { min-width: 0; max-width: 100%; flex-wrap: wrap; }
+.interval-input .el-input-number { max-width: 100%; }
+.form-help { width: 100%; overflow-wrap: anywhere; }
+.provider-form { width: 100%; }
+.models-fetch-row { width: 100%; min-width: 0; flex-wrap: wrap; }
+.models-fetch-row .form-help { width: auto; margin-top: 0; }
+.readonly-model-list { width: 100%; min-width: 0; }
+.readonly-model-list .el-tag { min-width: 0; max-width: 100%; height: auto; min-height: 24px; white-space: normal; }
+.readonly-model-list .el-tag__content { min-width: 0; overflow-wrap: anywhere; }
+.provider-form .el-alert__content { min-width: 0; overflow-wrap: anywhere; }
+.drawer-actions { flex-wrap: wrap; }
+.drawer-actions .el-button + .el-button { margin-left: 0; }
+/* Teleported poppers need named root classes, not ancestor-dependent overrides.
+   Verified against the locked Element Plus 2.14.5 select/scrollbar/message DOM. */
+.responsive-select-popper { box-sizing: border-box; max-width: calc(100vw - 24px); }
+.responsive-select-popper .el-select-dropdown { max-width: 100%; }
+.responsive-select-popper .el-select-dropdown__wrap { max-height: min(274px, 45vh); max-height: min(274px, 45dvh); }
+.responsive-select-popper .el-select-dropdown__item { height: auto; min-height: 34px; padding-top: 8px; padding-bottom: 8px; line-height: 1.5; white-space: normal; overflow-wrap: anywhere; }
+.responsive-select-popper .el-select-dropdown__empty { white-space: normal; overflow-wrap: anywhere; }
+.responsive-feedback { max-width: calc(100vw - 24px); }
+.responsive-feedback .el-message__content { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.responsive-feedback .el-message__closeBtn { display: grid; place-items: center; width: 44px; height: 44px; right: 0; }
+.responsive-feedback.is-closable .el-message__content { padding-right: 32px; }
+@media (max-width: 767px) {
+  .settings-card, .settings-tabs { min-height: 0; }
+  .settings-tab-header { align-items: stretch; flex-direction: column; gap: 16px; }
+  .settings-tab-actions { width: 100%; }
+  .settings-tab-actions .el-button { flex: 1; min-height: 44px; }
+  .settings-form { padding: 20px 0 calc(24px + env(safe-area-inset-bottom, 0px)); }
+  .selected-model-row { display: grid; grid-template-columns: 22px minmax(0, 1fr); align-items: start; }
+  .selected-model-actions { grid-column: 1 / -1; justify-content: flex-end; }
+  .models-fetch-row { align-items: stretch; flex-direction: column; }
+  .models-fetch-row .el-button { align-self: flex-start; min-height: 44px; }
+  .drawer-actions .el-button { flex: 1; min-height: 44px; }
+  .provider-table .el-button { min-width: 44px; min-height: 44px; padding: 8px; margin-left: 0; }
+  .provider-toolbar > .el-button { min-height: 44px; }
+  .settings-form .el-input__inner, .settings-form .el-textarea__inner,
+  .settings-form .el-select__input, .provider-form .el-input__inner,
+  .provider-form .el-select__input { font-size: 16px; }
+  .responsive-select-popper .el-select-dropdown__item { min-height: 44px; }
+}

@@ -483,10 +483,10 @@ async function saveKnowledgeSettings() {
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     apiError.value = ''
     knowledgeSettingsEditing.value = false
-    ElMessage({ message: '知识整理设置保存成功', type: 'success', duration: 2200, showClose: true })
+    ElMessage({ customClass: 'responsive-feedback', message: '知识整理设置保存成功', type: 'success', duration: 2200, showClose: true })
   } catch (error) {
     apiError.value = `知识整理设置保存失败：${error.message}`
-    ElMessage({ message: `保存失败：${error.message}`, type: 'error', duration: 3200, showClose: true })
+    ElMessage({ customClass: 'responsive-feedback', message: `保存失败：${error.message}`, type: 'error', duration: 3200, showClose: true })
   } finally {
     savingKnowledgeSettings.value = false
   }
@@ -519,12 +519,12 @@ async function retryCompileRun(run) {
     }
     const created = await response.json()
     await loadCompileRuns()
-    ElMessage({ message: `整理记录 #${created.id} 已重新加入队列`, type: 'success', duration: 3000, showClose: true })
+    ElMessage({ customClass: 'responsive-feedback', message: `整理记录 #${created.id} 已重新加入队列`, type: 'success', duration: 3000, showClose: true })
     if (selectedCompileRun.value?.id === run.id) {
       await openCompileRun({ ...run, status: 'pending' })
     }
   } catch (error) {
-    ElMessage({ message: `重试失败：${error.message}`, type: 'error', duration: 4000, showClose: true })
+    ElMessage({ customClass: 'responsive-feedback', message: `重试失败：${error.message}`, type: 'error', duration: 4000, showClose: true })
   } finally {
     retryingCompileRunId.value = null
   }
@@ -689,7 +689,7 @@ function eventIcon(type) {
             <template #header>
               <div class="card-header">
                 <div><strong>整理记录</strong><span>共 {{ filteredCompileRuns.length }} 条记录</span></div>
-                <el-select v-model="compileSessionFilter" clearable filterable placeholder="按会话筛选" class="session-filter">
+                <el-select v-model="compileSessionFilter" clearable filterable placeholder="按会话筛选" class="session-filter" popper-class="responsive-select-popper session-filter-popper">
                   <el-option v-for="run in compileRuns" :key="run.sessionId" :label="run.sessionTitle" :value="run.sessionId" />
                 </el-select>
               </div>
@@ -731,18 +731,18 @@ function eventIcon(type) {
                 </div>
                 <el-form label-position="top" class="settings-form" :class="{ 'settings-form--readonly': !knowledgeSettingsEditing }">
                   <el-form-item label="模型选择">
-                    <el-select v-model="selectedModelKeys" class="multi-model-select" popper-class="model-select-popper" multiple filterable collapse-tags :max-collapse-tags="2" placeholder="按顺序选择备用模型" :disabled="!knowledgeSettingsEditing">
+                    <el-select v-model="selectedModelKeys" class="multi-model-select" popper-class="responsive-select-popper model-select-popper" multiple filterable collapse-tags :max-collapse-tags="2" placeholder="按顺序选择备用模型" :disabled="!knowledgeSettingsEditing">
                       <el-option v-for="option in modelOptions" :key="option.key" :label="option.label" :value="option.key" />
                     </el-select>
                     <div v-if="selectedModels.length" class="selected-model-order">
                       <div v-for="(model, index) in selectedModels" :key="`${model.providerId}::${model.modelName}`" class="selected-model-row">
                         <span class="selected-model-index">{{ index + 1 }}</span>
                         <span class="selected-model-name">{{ model.providerName }} / {{ model.modelName }}</span>
-                        <template v-if="knowledgeSettingsEditing">
+                        <div v-if="knowledgeSettingsEditing" class="selected-model-actions">
                           <el-button text size="small" :disabled="index === 0" @click="moveSelectedModel(index, -1)">上移</el-button>
                           <el-button text size="small" :disabled="index === selectedModels.length - 1" @click="moveSelectedModel(index, 1)">下移</el-button>
                           <el-button text type="danger" size="small" @click="removeSelectedModel(index)">移除</el-button>
-                        </template>
+                        </div>
                       </div>
                     </div>
                     <span class="form-help">按列表顺序逐个尝试模型；某个模型成功后停止，全部失败后任务失败。</span>
@@ -765,7 +765,7 @@ function eventIcon(type) {
                   <el-table-column prop="baseUrl" label="Base URL" min-width="270" />
                   <el-table-column label="可用模型" min-width="220"><template #default="{ row }"><div class="model-tags"><el-tag v-for="model in row.models" :key="model" size="small" effect="plain">{{ model }}</el-tag></div></template></el-table-column>
                   <el-table-column prop="modelsFetchedAt" label="最近获取" width="120" />
-                  <el-table-column label="操作" width="130" :fixed="isCompact ? false : 'right'"><template #default="{ row }"><el-button text type="primary" @click="openProviderEdit(row)"><el-icon><Edit /></el-icon></el-button><el-button text type="danger" @click="deleteProvider(row)"><el-icon><Delete /></el-icon></el-button></template></el-table-column>
+                  <el-table-column label="操作" width="130" :fixed="isCompact ? false : 'right'"><template #default="{ row }"><el-button text type="primary" :aria-label="`编辑供应商：${row.name}`" @click="openProviderEdit(row)"><el-icon><Edit /></el-icon></el-button><el-button text type="danger" :aria-label="`删除供应商：${row.name}`" @click="deleteProvider(row)"><el-icon><Delete /></el-icon></el-button></template></el-table-column>
                 </el-table>
               </el-tab-pane>
             </el-tabs>
@@ -904,7 +904,7 @@ function eventIcon(type) {
     <el-drawer v-model="providerDrawerVisible" :title="providerDrawerMode === 'create' ? '新增模型供应商' : '修改模型供应商'" :size="businessDrawerSize" direction="rtl" class="business-drawer provider-drawer">
       <el-form label-position="top" class="provider-form">
         <el-form-item label="供应商名称"><el-input v-model="providerForm.name" placeholder="例如：OpenAI" /></el-form-item>
-        <el-form-item label="接口类型"><el-select v-model="providerForm.type" class="full-width"><el-option label="Completions" value="completions" /><el-option label="Responses" value="responses" /><el-option label="Anthropic" value="anthropic" /></el-select></el-form-item>
+        <el-form-item label="接口类型"><el-select v-model="providerForm.type" class="full-width" popper-class="responsive-select-popper provider-type-popper"><el-option label="Completions" value="completions" /><el-option label="Responses" value="responses" /><el-option label="Anthropic" value="anthropic" /></el-select></el-form-item>
         <el-form-item label="Base URL"><el-input v-model="providerForm.baseUrl" placeholder="https://api.example.com/v1" /></el-form-item>
         <el-form-item label="API Key"><el-input v-model="providerForm.apiKey" type="password" show-password placeholder="输入 API Key" /></el-form-item>
         <el-form-item label="可用模型列表">
