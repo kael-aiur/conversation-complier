@@ -31,6 +31,8 @@ const desktopCollapsed = ref(null) // null: follow mode defaults until the user 
 const isCompact = computed(() => viewportMode.value === 'compact')
 const isCollapsed = computed(() => desktopCollapsed.value ?? viewportMode.value === 'medium')
 const sidebarWidth = computed(() => isCompact.value ? '0px' : isCollapsed.value ? '72px' : '240px')
+// All business drawers share the same available-width contract as the shell.
+const businessDrawerSize = computed(() => isCompact.value ? '100%' : `calc(100vw - ${sidebarWidth.value})`)
 const navigationItems = [
   { index: 'sessions', title: '会话列表', icon: ChatDotRound },
   { index: 'compile-runs', title: '整理记录', icon: Tickets },
@@ -783,7 +785,7 @@ function eventIcon(type) {
       </el-menu>
     </el-drawer>
 
-    <el-drawer v-model="drawerVisible" :title="selectedSession?.title || '会话事件'" :size="isCollapsed ? 'calc(100vw - 72px)' : 'calc(100vw - 240px)'" direction="rtl" class="event-drawer">
+    <el-drawer v-model="drawerVisible" :title="selectedSession?.title || '会话事件'" :size="businessDrawerSize" direction="rtl" class="business-drawer event-drawer">
       <template #header>
         <div class="drawer-heading">
           <div><strong>{{ selectedSession?.title || '会话事件' }}</strong><span>{{ selectedSession?.id }}</span></div>
@@ -806,14 +808,14 @@ function eventIcon(type) {
             <p>{{ event.content }}</p>
             <div v-if="event.type === 'tool_call'" class="tool-call-details">
               <div class="tool-call-field"><span>工具</span><code>{{ event.tool || '未命名工具' }}</code></div>
-              <div class="tool-call-field"><span>参数</span><pre>{{ event.arguments }}</pre></div>
+              <div class="tool-call-field"><span>参数</span><pre tabindex="0" aria-label="工具参数">{{ event.arguments }}</pre></div>
             </div>
             <code v-else-if="event.tool">{{ event.tool }}</code>
           </div>
         </div>
       </div>
     </el-drawer>
-    <el-drawer v-model="compileDrawerVisible" :size="isCollapsed ? 'calc(100vw - 72px)' : 'calc(100vw - 240px)'" direction="rtl" class="compile-drawer" @closed="closeCompileRunDrawer">
+    <el-drawer v-model="compileDrawerVisible" :size="businessDrawerSize" direction="rtl" class="business-drawer compile-drawer" @closed="closeCompileRunDrawer">
       <template #header>
         <div class="drawer-heading">
           <div><strong>{{ selectedCompileRun?.sessionTitle || '整理记录' }}</strong><span>{{ selectedCompileRun?.id }} · {{ selectedCompileRun?.sessionId }}</span></div>
@@ -853,7 +855,7 @@ function eventIcon(type) {
               <div class="trace-entry-marker"><span v-if="entry.status === 'running'" class="trace-spinner"></span><span v-else-if="entry.status === 'failed'">!</span><span v-else>•</span></div>
               <div class="trace-entry-body">
                 <div class="trace-entry-header"><div><el-tag size="small" effect="plain">{{ traceRoleLabel(entry.role) }}</el-tag><strong>{{ entry.title }}</strong></div><div><el-tag :type="entry.status === 'failed' ? 'danger' : entry.status === 'running' ? 'primary' : 'info'" size="small" effect="light">{{ traceStatusLabel(entry.status) }}</el-tag><time>{{ formatUpdatedAt(entry.createdAt) }}</time></div></div>
-                <pre v-if="entry.content" class="trace-entry-content">{{ entry.content }}</pre>
+                <pre v-if="entry.content" class="trace-entry-content" tabindex="0" aria-label="执行过程内容">{{ entry.content }}</pre>
               </div>
             </article>
           </div>
@@ -866,7 +868,7 @@ function eventIcon(type) {
             <div class="failure-heading"><el-icon><WarningFilled /></el-icon><strong>失败原因</strong></div>
             <el-button type="primary" size="small" :loading="retryingCompileRunId === selectedCompileRun.id" :disabled="retryingCompileRunId !== null && retryingCompileRunId !== selectedCompileRun.id" @click="retryCompileRun(selectedCompileRun)">重试整理</el-button>
           </div>
-          <pre class="failure-message">{{ selectedCompileRun.errorMessage || '任务失败，但服务端没有返回具体错误信息。' }}</pre>
+          <pre class="failure-message" tabindex="0" aria-label="失败原因">{{ selectedCompileRun.errorMessage || '任务失败，但服务端没有返回具体错误信息。' }}</pre>
         </section>
         <section v-if="selectedCompileRun.attempts?.length" class="compile-attempt-section">
           <div class="result-section-title"><span class="result-icon result-icon--attempt">↻</span><strong>模型尝试记录</strong><span class="result-count">{{ selectedCompileRun.attempts.length }}</span></div>
@@ -897,7 +899,7 @@ function eventIcon(type) {
       </template>
     </el-drawer>
 
-    <el-drawer v-model="providerDrawerVisible" :title="providerDrawerMode === 'create' ? '新增模型供应商' : '修改模型供应商'" :size="isCollapsed ? 'calc(100vw - 72px)' : 'calc(100vw - 240px)'" direction="rtl" class="provider-drawer">
+    <el-drawer v-model="providerDrawerVisible" :title="providerDrawerMode === 'create' ? '新增模型供应商' : '修改模型供应商'" :size="businessDrawerSize" direction="rtl" class="business-drawer provider-drawer">
       <el-form label-position="top" class="provider-form">
         <el-form-item label="供应商名称"><el-input v-model="providerForm.name" placeholder="例如：OpenAI" /></el-form-item>
         <el-form-item label="接口类型"><el-select v-model="providerForm.type" class="full-width"><el-option label="Completions" value="completions" /><el-option label="Responses" value="responses" /><el-option label="Anthropic" value="anthropic" /></el-select></el-form-item>

@@ -330,3 +330,46 @@ h1 { margin: 0; color: #172033; font-size: 28px; line-height: 1.2; }
 /* Long status labels must stay readable inside their original 120px column. */
 .session-table .el-tag { max-width: 100%; height: auto; min-height: 24px; white-space: normal; }
 .session-table .el-tag__content { white-space: normal; overflow-wrap: anywhere; }
+
+/* T03 business drawer contract. Keep the original component instances and callbacks;
+   only the body owns vertical scrolling. The header's text can scroll independently
+   for unusually long titles without moving the close button off a short viewport. */
+.business-drawer { min-width: 0; max-width: 100vw; height: 100vh; height: 100dvh; }
+.business-drawer .el-drawer__header { flex: 0 0 auto; min-width: 0; align-items: flex-start; gap: 8px; padding: 16px 20px; }
+.business-drawer .el-drawer__title { min-width: 0; overflow-wrap: anywhere; }
+.business-drawer .el-drawer__close-btn { flex: 0 0 44px; width: 44px; height: 44px; margin: 0; }
+.business-drawer .el-drawer__body { min-width: 0; min-height: 0; padding: 18px 20px calc(24px + env(safe-area-inset-bottom, 0px)); overflow: auto; }
+.business-drawer .drawer-heading { flex: 1; min-width: 0; width: auto; max-height: 28vh; max-height: 28dvh; overflow: auto; padding-right: 0; flex-wrap: wrap; }
+.business-drawer .drawer-heading > div { flex: 1 1 200px; }
+.business-drawer .drawer-heading strong, .business-drawer .drawer-heading span,
+.business-drawer .drawer-summary strong, .business-drawer .compile-run-summary strong { white-space: normal; overflow-wrap: anywhere; overflow: visible; text-overflow: clip; }
+.business-drawer .el-tag { flex-shrink: 0; max-width: 100%; min-height: 24px; height: auto; white-space: normal; }
+.business-drawer .el-tag__content { min-width: 0; overflow-wrap: anywhere; }
+.drawer-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.drawer-summary > div { min-width: 0; }
+.event-meta, .failure-panel-header, .compile-attempt-header, .trace-entry-header,
+.trace-entry-header > div, .result-section-title, .compile-warning-heading { flex-wrap: wrap; }
+.event-meta > *, .trace-entry-header > div, .compile-trace-live > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.event-bubble p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.event-bubble code { max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tool-call-details, .tool-call-field { min-width: 0; }
+.tool-call-field > pre, .trace-entry-content, .failure-message { max-width: 100%; max-height: 340px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tool-call-field > pre { max-height: 260px; }
+.business-drawer pre:focus-visible { outline: 2px solid #2d6cdf; outline-offset: 2px; }
+.result-summary, .knowledge-result-list li { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.result-icon, .knowledge-bullet { flex-shrink: 0; }
+.business-drawer .el-alert__content { min-width: 0; overflow-wrap: anywhere; }
+.compile-failure-section .el-button { min-width: 88px; min-height: 44px; margin-left: 0; }
+@media (min-width: 768px) and (max-width: 1199px) {
+  .drawer-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 767px) {
+  .business-drawer .el-drawer__header { padding: 12px; }
+  .business-drawer .el-drawer__body { padding: 16px 12px calc(24px + env(safe-area-inset-bottom, 0px)); }
+  .business-drawer .drawer-heading > div { flex-basis: 100%; }
+  .drawer-summary, .compile-run-summary { grid-template-columns: minmax(0, 1fr); }
+  .event-item { gap: 8px; }
+  .event-bubble, .trace-entry-body { padding: 10px; }
+  .trace-entry-header { align-items: flex-start; flex-direction: column; }
+  .compile-warning-section, .compile-failure-section, .compile-attempt-card { padding: 12px; }
+}
