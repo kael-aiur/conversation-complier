@@ -33,6 +33,8 @@ const isCollapsed = computed(() => desktopCollapsed.value ?? viewportMode.value 
 const sidebarWidth = computed(() => isCompact.value ? '0px' : isCollapsed.value ? '72px' : '240px')
 // All business drawers share the same available-width contract as the shell.
 const businessDrawerSize = computed(() => isCompact.value ? '100%' : `calc(100vw - ${sidebarWidth.value})`)
+// Keep body-teleported selects inside short viewports, even if neither side fits.
+const responsivePopperOptions = { modifiers: [{ name: 'preventOverflow', options: { altAxis: true, tether: false, padding: 12 } }] }
 const navigationItems = [
   { index: 'sessions', title: '会话列表', icon: ChatDotRound },
   { index: 'compile-runs', title: '整理记录', icon: Tickets },
@@ -689,7 +691,7 @@ function eventIcon(type) {
             <template #header>
               <div class="card-header">
                 <div><strong>整理记录</strong><span>共 {{ filteredCompileRuns.length }} 条记录</span></div>
-                <el-select v-model="compileSessionFilter" clearable filterable placeholder="按会话筛选" class="session-filter" popper-class="responsive-select-popper session-filter-popper">
+                <el-select v-model="compileSessionFilter" clearable filterable placeholder="按会话筛选" class="session-filter" :popper-options="responsivePopperOptions" popper-class="responsive-select-popper session-filter-popper">
                   <el-option v-for="run in compileRuns" :key="run.sessionId" :label="run.sessionTitle" :value="run.sessionId" />
                 </el-select>
               </div>
@@ -731,7 +733,7 @@ function eventIcon(type) {
                 </div>
                 <el-form label-position="top" class="settings-form" :class="{ 'settings-form--readonly': !knowledgeSettingsEditing }">
                   <el-form-item label="模型选择">
-                    <el-select v-model="selectedModelKeys" class="multi-model-select" popper-class="responsive-select-popper model-select-popper" multiple filterable collapse-tags :max-collapse-tags="2" placeholder="按顺序选择备用模型" :disabled="!knowledgeSettingsEditing">
+                    <el-select v-model="selectedModelKeys" class="multi-model-select" :popper-options="responsivePopperOptions" popper-class="responsive-select-popper model-select-popper" multiple filterable collapse-tags :max-collapse-tags="2" placeholder="按顺序选择备用模型" :disabled="!knowledgeSettingsEditing">
                       <el-option v-for="option in modelOptions" :key="option.key" :label="option.label" :value="option.key" />
                     </el-select>
                     <div v-if="selectedModels.length" class="selected-model-order">
@@ -904,7 +906,7 @@ function eventIcon(type) {
     <el-drawer v-model="providerDrawerVisible" :title="providerDrawerMode === 'create' ? '新增模型供应商' : '修改模型供应商'" :size="businessDrawerSize" direction="rtl" class="business-drawer provider-drawer">
       <el-form label-position="top" class="provider-form">
         <el-form-item label="供应商名称"><el-input v-model="providerForm.name" placeholder="例如：OpenAI" /></el-form-item>
-        <el-form-item label="接口类型"><el-select v-model="providerForm.type" class="full-width" popper-class="responsive-select-popper provider-type-popper"><el-option label="Completions" value="completions" /><el-option label="Responses" value="responses" /><el-option label="Anthropic" value="anthropic" /></el-select></el-form-item>
+        <el-form-item label="接口类型"><el-select v-model="providerForm.type" class="full-width" :popper-options="responsivePopperOptions" popper-class="responsive-select-popper provider-type-popper"><el-option label="Completions" value="completions" /><el-option label="Responses" value="responses" /><el-option label="Anthropic" value="anthropic" /></el-select></el-form-item>
         <el-form-item label="Base URL"><el-input v-model="providerForm.baseUrl" placeholder="https://api.example.com/v1" /></el-form-item>
         <el-form-item label="API Key"><el-input v-model="providerForm.apiKey" type="password" show-password placeholder="输入 API Key" /></el-form-item>
         <el-form-item label="可用模型列表">
