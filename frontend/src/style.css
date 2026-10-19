@@ -298,3 +298,32 @@ h1 { margin: 0; color: #172033; font-size: 28px; line-height: 1.2; }
   .card-header { align-items: flex-start; flex-direction: column; }
   .search-input, .session-filter { width: 100%; }
 }
+
+/* T02: one horizontal scroll owner per table (Element Plus scrollbar).
+   Grid tracks follow the shared 768/1200 thresholds, not el-col's 576px sm. */
+.overview-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.overview-grid:has(> .el-col:nth-child(3):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.overview-grid > .el-col { width: auto; max-width: none; min-width: 0; }
+.page-heading, .page-heading > div, .session-card, .settings-card,
+.card-header, .card-header > div, .provider-toolbar, .provider-toolbar > div { min-width: 0; max-width: 100%; }
+.page-heading, .card-header, .card-header > div { flex-wrap: wrap; }
+.page-description, .api-status, .provider-toolbar { overflow-wrap: anywhere; }
+.metric-icon, .provider-mark { flex-shrink: 0; }
+.metric-card strong, .metric-label, .metric-copy small { overflow-wrap: anywhere; }
+.session-table, .provider-table { min-width: 0; max-width: 100%; }
+.session-title small, .provider-name, .provider-table .cell { overflow-wrap: anywhere; }
+.provider-name, .provider-name > div { min-width: 0; }
+.model-tags .el-tag { max-width: 100%; height: auto; min-height: 20px; white-space: normal; }
+.model-tags .el-tag__content { min-width: 0; overflow-wrap: anywhere; }
+.table-scroll-hint { margin: 0 0 12px; color: #607087; font-size: 12px; line-height: 1.6; }
+.session-table .el-scrollbar__wrap:focus-visible, .provider-table .el-scrollbar__wrap:focus-visible { outline: 2px solid #2d6cdf; outline-offset: -2px; }
+@media (min-width: 768px) and (max-width: 1199px) {
+  .overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 767px) {
+  .overview-grid, .overview-grid:has(> .el-col:nth-child(3):last-child) { grid-template-columns: minmax(0, 1fr); }
+  .page-heading { gap: 16px; }
+  .card-header { align-items: stretch; }
+  .card-header > div { gap: 6px 10px; }
+  .search-input, .session-filter { width: 100%; }
+}

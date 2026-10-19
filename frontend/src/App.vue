@@ -646,7 +646,7 @@ function eventIcon(type) {
         </div>
 
         <template v-if="activeMenu === 'sessions'">
-          <el-row :gutter="16" class="overview-grid">
+          <el-row :gutter="0" class="overview-grid">
             <el-col v-for="metric in metrics" :key="metric.label" :xs="24" :sm="12" :lg="6">
               <el-card shadow="never" class="metric-card">
                 <div class="metric-icon" :class="`metric-icon--${metric.color}`"><el-icon><component :is="metric.icon" /></el-icon></div>
@@ -662,7 +662,8 @@ function eventIcon(type) {
                 <el-input v-model="searchText" clearable placeholder="搜索会话" :prefix-icon="Search" class="search-input" />
               </div>
             </template>
-            <el-table v-loading="loadingSessions" :data="filteredSessions" class="session-table" row-class-name="session-row" @row-click="openSession">
+            <p v-if="isCompact" class="table-scroll-hint">左右滑动查看全部列（含操作），也可聚焦表格后使用方向键</p>
+            <el-table v-loading="loadingSessions" :data="filteredSessions" class="session-table" :scrollbar-tabindex="0" row-class-name="session-row" @row-click="openSession">
               <el-table-column label="会话" min-width="300">
                 <template #default="{ row }"><div class="session-title"><span class="session-dot" :class="`session-dot--${row.status}`"></span><div><strong>{{ row.title }}</strong><small>{{ row.id }}</small></div></div></template>
               </el-table-column>
@@ -676,7 +677,7 @@ function eventIcon(type) {
         </template>
 
         <template v-else-if="activeMenu === 'compile-runs'">
-          <el-row :gutter="16" class="overview-grid">
+          <el-row :gutter="0" class="overview-grid">
             <el-col :xs="24" :sm="8"><el-card shadow="never" class="metric-card"><div class="metric-icon metric-icon--purple"><el-icon><Tickets /></el-icon></div><div class="metric-copy"><span class="metric-label">整理次数</span><strong>{{ compileRuns.length }}</strong><small>全部会话</small></div></el-card></el-col>
             <el-col :xs="24" :sm="8"><el-card shadow="never" class="metric-card"><div class="metric-icon metric-icon--green"><el-icon><Document /></el-icon></div><div class="metric-copy"><span class="metric-label">生成知识条目</span><strong>{{ compileRuns.reduce((sum, run) => sum + run.knowledgeCount, 0) }}</strong><small>模拟统计</small></div></el-card></el-col>
             <el-col :xs="24" :sm="8"><el-card shadow="never" class="metric-card"><div class="metric-icon metric-icon--orange"><el-icon><Clock /></el-icon></div><div class="metric-copy"><span class="metric-label">整理中</span><strong>{{ compileRuns.filter((run) => run.status === 'running').length }}</strong><small>当前任务</small></div></el-card></el-col>
@@ -691,14 +692,15 @@ function eventIcon(type) {
                 </el-select>
               </div>
             </template>
-            <el-table v-loading="loadingCompileRuns" :data="filteredCompileRuns" class="session-table" @row-click="openCompileRun">
+            <p v-if="isCompact" class="table-scroll-hint">左右滑动查看全部列（含操作），也可聚焦表格后使用方向键</p>
+            <el-table v-loading="loadingCompileRuns" :data="filteredCompileRuns" class="session-table" :scrollbar-tabindex="0" @row-click="openCompileRun">
               <el-table-column label="整理记录" min-width="300"><template #default="{ row }"><div class="session-title"><span class="run-status-dot" :class="`run-status-dot--${row.status}`"></span><div><strong>{{ row.sessionTitle }}</strong><small>{{ row.id }} · {{ row.sessionId }}</small></div></div></template></el-table-column>
               <el-table-column label="状态" width="120"><template #default="{ row }"><el-tag :type="compileStatusType(row.status)" effect="light" round>{{ compileStatusLabel(row.status) }}</el-tag></template></el-table-column>
               <el-table-column label="处理范围" width="150"><template #default="{ row }"><span class="version-range">v{{ row.fromVersion }} → v{{ row.toVersion }}</span></template></el-table-column>
               <el-table-column label="知识条目" width="110"><template #default="{ row }"><span class="event-count">{{ row.knowledgeCount }}</span></template></el-table-column>
               <el-table-column prop="startedAt" label="开始时间" width="125" />
               <el-table-column prop="duration" label="耗时" width="110" />
-              <el-table-column label="操作" width="120" fixed="right">
+              <el-table-column label="操作" width="120" :fixed="isCompact ? false : 'right'">
                 <template #default="{ row }">
                   <el-button v-if="row.status === 'failed'" text type="primary" :loading="retryingCompileRunId === row.id" :disabled="retryingCompileRunId !== null && retryingCompileRunId !== row.id" @click.stop="retryCompileRun(row)">重试</el-button>
                   <span v-else class="table-action-placeholder">—</span>
@@ -755,12 +757,13 @@ function eventIcon(type) {
               </el-tab-pane>
               <el-tab-pane label="模型供应商" name="providers">
                 <div class="provider-toolbar"><div><strong>模型供应商</strong><span>管理用于知识整理的模型接口</span></div><el-button type="primary" @click="openProviderCreate"><el-icon><Plus /></el-icon>新增供应商</el-button></div>
-                <el-table :data="providers" class="provider-table">
+                <p v-if="isCompact" class="table-scroll-hint">左右滑动查看全部列（含操作），也可聚焦表格后使用方向键</p>
+                <el-table :data="providers" class="provider-table" :scrollbar-tabindex="0">
                   <el-table-column label="供应商" min-width="190"><template #default="{ row }"><div class="provider-name"><span class="provider-mark">{{ row.name.slice(0, 1) }}</span><div><strong>{{ row.name }}</strong><small>{{ row.type }}</small></div></div></template></el-table-column>
                   <el-table-column prop="baseUrl" label="Base URL" min-width="270" />
                   <el-table-column label="可用模型" min-width="220"><template #default="{ row }"><div class="model-tags"><el-tag v-for="model in row.models" :key="model" size="small" effect="plain">{{ model }}</el-tag></div></template></el-table-column>
                   <el-table-column prop="modelsFetchedAt" label="最近获取" width="120" />
-                  <el-table-column label="操作" width="130" fixed="right"><template #default="{ row }"><el-button text type="primary" @click="openProviderEdit(row)"><el-icon><Edit /></el-icon></el-button><el-button text type="danger" @click="deleteProvider(row)"><el-icon><Delete /></el-icon></el-button></template></el-table-column>
+                  <el-table-column label="操作" width="130" :fixed="isCompact ? false : 'right'"><template #default="{ row }"><el-button text type="primary" @click="openProviderEdit(row)"><el-icon><Edit /></el-icon></el-button><el-button text type="danger" @click="deleteProvider(row)"><el-icon><Delete /></el-icon></el-button></template></el-table-column>
                 </el-table>
               </el-tab-pane>
             </el-tabs>
