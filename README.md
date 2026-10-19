@@ -27,6 +27,8 @@ pnpm dev
 
 前端开发服务器默认运行在 `http://127.0.0.1:5173`，`/api` 请求代理到 Spring Boot 的 `http://127.0.0.1:8080`。
 
+响应式断点、源码维护与分层证据/部署交接见 [响应式布局说明](docs/responsive-layout.md)。
+
 ## 前端构建
 
 ```bash
