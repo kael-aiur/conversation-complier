@@ -327,3 +327,6 @@ h1 { margin: 0; color: #172033; font-size: 28px; line-height: 1.2; }
   .card-header > div { gap: 6px 10px; }
   .search-input, .session-filter { width: 100%; }
 }
+/* Long status labels must stay readable inside their original 120px column. */
+.session-table .el-tag { max-width: 100%; height: auto; min-height: 24px; white-space: normal; }
+.session-table .el-tag__content { white-space: normal; overflow-wrap: anywhere; }
