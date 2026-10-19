@@ -787,11 +787,12 @@ function eventIcon(type) {
 
     <el-drawer v-model="drawerVisible" :title="selectedSession?.title || '会话事件'" :size="businessDrawerSize" direction="rtl" class="business-drawer event-drawer">
       <template #header>
-        <div class="drawer-heading">
+        <div class="drawer-heading" tabindex="0" aria-label="详情标题和状态">
           <div><strong>{{ selectedSession?.title || '会话事件' }}</strong><span>{{ selectedSession?.id }}</span></div>
           <el-tag v-if="selectedSession" :type="statusType(selectedSession.status)" effect="light" round>{{ statusLabel(selectedSession.status) }}</el-tag>
         </div>
       </template>
+      <el-alert v-if="apiError" :title="apiError" type="error" :closable="false" show-icon />
       <div class="drawer-summary">
         <div><span>来源</span><strong>{{ selectedSession?.source }}</strong></div>
         <div><span>事件数</span><strong>{{ selectedSession?.events }}</strong></div>
@@ -817,11 +818,12 @@ function eventIcon(type) {
     </el-drawer>
     <el-drawer v-model="compileDrawerVisible" :size="businessDrawerSize" direction="rtl" class="business-drawer compile-drawer" @closed="closeCompileRunDrawer">
       <template #header>
-        <div class="drawer-heading">
+        <div class="drawer-heading" tabindex="0" aria-label="详情标题和状态">
           <div><strong>{{ selectedCompileRun?.sessionTitle || '整理记录' }}</strong><span>{{ selectedCompileRun?.id }} · {{ selectedCompileRun?.sessionId }}</span></div>
           <el-tag v-if="selectedCompileRun" :type="compileStatusType(selectedCompileRun.status)" effect="light" round>{{ compileStatusLabel(selectedCompileRun.status) }}</el-tag>
         </div>
       </template>
+      <el-alert v-if="apiError" :title="apiError" type="error" :closable="false" show-icon />
       <template v-if="selectedCompileRun">
         <el-skeleton v-if="loadingCompileDetail" :rows="6" animated />
         <template v-else>
