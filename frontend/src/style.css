@@ -428,3 +428,7 @@ h1 { margin: 0; color: #172033; font-size: 28px; line-height: 1.2; }
   .provider-form .el-select__input { font-size: 16px; }
   .responsive-select-popper .el-select-dropdown__item { min-height: 44px; }
 }
+/* Message's icon is a flex item in 2.14.5: long text must not shrink its hit area. */
+.responsive-feedback { max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); }
+.responsive-feedback .el-message__content { max-height: calc(100vh - 64px); max-height: calc(100dvh - 64px); overflow: auto; }
+.responsive-feedback .el-message__closeBtn { flex-shrink: 0; }
