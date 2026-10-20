@@ -21,7 +21,42 @@ import {
   WarningFilled,
 } from '@element-plus/icons-vue'
 
-const isCollapsed = ref(false)
+// Shared layout contract: compact <768, medium <1200, desktop otherwise.
+const compactMedia = window.matchMedia('(max-width: 767px)')
+const mediumMedia = window.matchMedia('(max-width: 1199px)')
+const viewportMode = ref(readViewportMode())
+const mobileNavOpen = ref(false)
+const sidebarToggle = ref(null)
+const desktopCollapsed = ref(null) // null: follow mode defaults until the user chooses
+const isCompact = computed(() => viewportMode.value === 'compact')
+const isCollapsed = computed(() => desktopCollapsed.value ?? viewportMode.value === 'medium')
+const sidebarWidth = computed(() => isCompact.value ? '0px' : isCollapsed.value ? '72px' : '240px')
+// All business drawers share the same available-width contract as the shell.
+const businessDrawerSize = computed(() => isCompact.value ? '100%' : `calc(100vw - ${sidebarWidth.value})`)
+// Keep body-teleported selects inside short viewports, even if neither side fits.
+const responsivePopperOptions = { modifiers: [{ name: 'preventOverflow', options: { altAxis: true, tether: false, padding: 12 } }] }
+const navigationItems = [
+  { index: 'sessions', title: '会话列表', icon: ChatDotRound },
+  { index: 'compile-runs', title: '整理记录', icon: Tickets },
+  { index: 'settings', title: '知识整理设置', icon: Setting },
+]
+
+function readViewportMode() {
+  return compactMedia.matches ? 'compact' : mediumMedia.matches ? 'medium' : 'desktop'
+}
+
+function syncViewportMode() {
+  viewportMode.value = readViewportMode()
+  if (viewportMode.value !== 'compact') mobileNavOpen.value = false
+}
+
+async function restoreNavigationFocus() {
+  // A business drawer must retain its own focus trap when replacing navigation.
+  await nextTick()
+  if (!drawerVisible.value && !compileDrawerVisible.value && !providerDrawerVisible.value) {
+    sidebarToggle.value?.$el?.focus()
+  }
+}
 const activeMenu = ref('sessions')
 const contentArea = ref(null)
 const apiStatus = ref('未检查')
@@ -213,6 +248,7 @@ function normalizeCompileRun(run) {
 }
 
 async function openSession(row) {
+  mobileNavOpen.value = false
   selectedSession.value = row
   selectedEvents.value = []
   drawerVisible.value = true
@@ -297,10 +333,20 @@ function formatUpdatedAt(value) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-onMounted(() => { loadSessions(); loadCompileRuns(); loadProviders(); loadKnowledgeSettings() })
-onUnmounted(stopCompileRunPolling)
+onMounted(() => {
+  compactMedia.addEventListener('change', syncViewportMode)
+  mediumMedia.addEventListener('change', syncViewportMode)
+  syncViewportMode()
+  loadSessions(); loadCompileRuns(); loadProviders(); loadKnowledgeSettings()
+})
+onUnmounted(() => {
+  compactMedia.removeEventListener('change', syncViewportMode)
+  mediumMedia.removeEventListener('change', syncViewportMode)
+  stopCompileRunPolling()
+})
 
 async function selectMenu(menu) {
+  mobileNavOpen.value = false
   activeMenu.value = menu
   await nextTick()
   const element = contentArea.value?.$el
@@ -308,7 +354,13 @@ async function selectMenu(menu) {
 }
 
 function toggleSidebar() {
-  isCollapsed.value = !isCollapsed.value
+  if (isCompact.value) {
+    if (!drawerVisible.value && !compileDrawerVisible.value && !providerDrawerVisible.value) {
+      mobileNavOpen.value = !mobileNavOpen.value
+    }
+  } else {
+    desktopCollapsed.value = !isCollapsed.value
+  }
 }
 
 function statusLabel(status) {
@@ -336,6 +388,7 @@ function attemptStatusType(status) {
 }
 
 function openProviderCreate() {
+  mobileNavOpen.value = false
   providerDrawerMode.value = 'create'
   providerDrawerError.value = ''
   providerModelsFetched.value = false
@@ -344,6 +397,7 @@ function openProviderCreate() {
 }
 
 function openProviderEdit(provider) {
+  mobileNavOpen.value = false
   providerDrawerMode.value = 'edit'
   providerDrawerError.value = ''
   providerModelsFetched.value = false
@@ -431,10 +485,10 @@ async function saveKnowledgeSettings() {
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     apiError.value = ''
     knowledgeSettingsEditing.value = false
-    ElMessage({ message: '知识整理设置保存成功', type: 'success', duration: 2200, showClose: true })
+    ElMessage({ customClass: 'responsive-feedback', message: '知识整理设置保存成功', type: 'success', duration: 2200, showClose: true })
   } catch (error) {
     apiError.value = `知识整理设置保存失败：${error.message}`
-    ElMessage({ message: `保存失败：${error.message}`, type: 'error', duration: 3200, showClose: true })
+    ElMessage({ customClass: 'responsive-feedback', message: `保存失败：${error.message}`, type: 'error', duration: 3200, showClose: true })
   } finally {
     savingKnowledgeSettings.value = false
   }
@@ -467,12 +521,12 @@ async function retryCompileRun(run) {
     }
     const created = await response.json()
     await loadCompileRuns()
-    ElMessage({ message: `整理记录 #${created.id} 已重新加入队列`, type: 'success', duration: 3000, showClose: true })
+    ElMessage({ customClass: 'responsive-feedback', message: `整理记录 #${created.id} 已重新加入队列`, type: 'success', duration: 3000, showClose: true })
     if (selectedCompileRun.value?.id === run.id) {
       await openCompileRun({ ...run, status: 'pending' })
     }
   } catch (error) {
-    ElMessage({ message: `重试失败：${error.message}`, type: 'error', duration: 4000, showClose: true })
+    ElMessage({ customClass: 'responsive-feedback', message: `重试失败：${error.message}`, type: 'error', duration: 4000, showClose: true })
   } finally {
     retryingCompileRunId.value = null
   }
@@ -524,6 +578,7 @@ function stopCompileRunPolling() {
 }
 
 async function openCompileRun(run) {
+  mobileNavOpen.value = false
   stopCompileRunPolling()
   selectedCompileRun.value = { ...run, trace: [], knowledge: [], attempts: [] }
   compileDrawerVisible.value = true
@@ -550,25 +605,17 @@ function eventIcon(type) {
 </script>
 
 <template>
-  <el-container class="app-shell">
-    <el-aside :width="isCollapsed ? '72px' : '240px'" class="app-sidebar">
+  <el-container class="app-shell" :class="`app-shell--${viewportMode}`" :style="{ '--sidebar-width': sidebarWidth }">
+    <el-aside v-if="!isCompact" :width="sidebarWidth" class="app-sidebar" aria-label="主导航">
       <div class="brand" :class="{ 'brand--collapsed': isCollapsed }">
         <div class="brand-mark"><Connection :size="20" /></div>
         <div v-if="!isCollapsed" class="brand-copy"><strong>Conversation</strong><span>Compiler</span></div>
       </div>
 
       <el-menu :default-active="activeMenu" :collapse="isCollapsed" class="sidebar-menu" @select="selectMenu">
-        <el-menu-item index="sessions">
-          <el-icon><ChatDotRound /></el-icon>
-          <template #title>会话列表</template>
-        </el-menu-item>
-        <el-menu-item index="compile-runs">
-          <el-icon><Tickets /></el-icon>
-          <template #title>整理记录</template>
-        </el-menu-item>
-        <el-menu-item index="settings">
-          <el-icon><Setting /></el-icon>
-          <template #title>知识整理设置</template>
+        <el-menu-item v-for="item in navigationItems" :key="item.index" :index="item.index" :aria-current="activeMenu === item.index ? 'page' : undefined">
+          <el-icon><component :is="item.icon" /></el-icon>
+          <template #title>{{ item.title }}</template>
         </el-menu-item>
       </el-menu>
 
@@ -581,7 +628,7 @@ function eventIcon(type) {
     <el-container class="main-container">
       <el-header class="topbar">
         <div class="topbar-left">
-          <el-button text class="collapse-button" @click="toggleSidebar"><el-icon :size="20"><Fold v-if="!isCollapsed" /><MenuIcon v-else /></el-icon></el-button>
+          <el-button ref="sidebarToggle" text class="collapse-button" :aria-label="isCompact ? '打开主导航' : isCollapsed ? '展开侧栏' : '折叠侧栏'" :aria-expanded="isCompact ? mobileNavOpen : !isCollapsed" :aria-controls="isCompact ? 'mobile-navigation' : undefined" @click="toggleSidebar"><el-icon :size="20"><Fold v-if="!isCompact && !isCollapsed" /><MenuIcon v-else /></el-icon></el-button>
           <div class="breadcrumb"><span>控制台</span><span class="breadcrumb-separator">/</span><strong>{{ pageTitle }}</strong></div>
         </div>
         <div class="topbar-right">
@@ -603,7 +650,7 @@ function eventIcon(type) {
         </div>
 
         <template v-if="activeMenu === 'sessions'">
-          <el-row :gutter="16" class="overview-grid">
+          <el-row :gutter="0" class="overview-grid">
             <el-col v-for="metric in metrics" :key="metric.label" :xs="24" :sm="12" :lg="6">
               <el-card shadow="never" class="metric-card">
                 <div class="metric-icon" :class="`metric-icon--${metric.color}`"><el-icon><component :is="metric.icon" /></el-icon></div>
@@ -619,7 +666,8 @@ function eventIcon(type) {
                 <el-input v-model="searchText" clearable placeholder="搜索会话" :prefix-icon="Search" class="search-input" />
               </div>
             </template>
-            <el-table v-loading="loadingSessions" :data="filteredSessions" class="session-table" row-class-name="session-row" @row-click="openSession">
+            <p v-if="isCompact" class="table-scroll-hint">左右滑动查看全部列（含操作），也可聚焦表格后使用方向键</p>
+            <el-table v-loading="loadingSessions" :data="filteredSessions" class="session-table" :scrollbar-tabindex="0" row-class-name="session-row" @row-click="openSession">
               <el-table-column label="会话" min-width="300">
                 <template #default="{ row }"><div class="session-title"><span class="session-dot" :class="`session-dot--${row.status}`"></span><div><strong>{{ row.title }}</strong><small>{{ row.id }}</small></div></div></template>
               </el-table-column>
@@ -633,7 +681,7 @@ function eventIcon(type) {
         </template>
 
         <template v-else-if="activeMenu === 'compile-runs'">
-          <el-row :gutter="16" class="overview-grid">
+          <el-row :gutter="0" class="overview-grid">
             <el-col :xs="24" :sm="8"><el-card shadow="never" class="metric-card"><div class="metric-icon metric-icon--purple"><el-icon><Tickets /></el-icon></div><div class="metric-copy"><span class="metric-label">整理次数</span><strong>{{ compileRuns.length }}</strong><small>全部会话</small></div></el-card></el-col>
             <el-col :xs="24" :sm="8"><el-card shadow="never" class="metric-card"><div class="metric-icon metric-icon--green"><el-icon><Document /></el-icon></div><div class="metric-copy"><span class="metric-label">生成知识条目</span><strong>{{ compileRuns.reduce((sum, run) => sum + run.knowledgeCount, 0) }}</strong><small>模拟统计</small></div></el-card></el-col>
             <el-col :xs="24" :sm="8"><el-card shadow="never" class="metric-card"><div class="metric-icon metric-icon--orange"><el-icon><Clock /></el-icon></div><div class="metric-copy"><span class="metric-label">整理中</span><strong>{{ compileRuns.filter((run) => run.status === 'running').length }}</strong><small>当前任务</small></div></el-card></el-col>
@@ -643,19 +691,20 @@ function eventIcon(type) {
             <template #header>
               <div class="card-header">
                 <div><strong>整理记录</strong><span>共 {{ filteredCompileRuns.length }} 条记录</span></div>
-                <el-select v-model="compileSessionFilter" clearable filterable placeholder="按会话筛选" class="session-filter">
+                <el-select v-model="compileSessionFilter" clearable filterable placeholder="按会话筛选" class="session-filter" :popper-options="responsivePopperOptions" popper-class="responsive-select-popper session-filter-popper">
                   <el-option v-for="run in compileRuns" :key="run.sessionId" :label="run.sessionTitle" :value="run.sessionId" />
                 </el-select>
               </div>
             </template>
-            <el-table v-loading="loadingCompileRuns" :data="filteredCompileRuns" class="session-table" @row-click="openCompileRun">
+            <p v-if="isCompact" class="table-scroll-hint">左右滑动查看全部列（含操作），也可聚焦表格后使用方向键</p>
+            <el-table v-loading="loadingCompileRuns" :data="filteredCompileRuns" class="session-table" :scrollbar-tabindex="0" @row-click="openCompileRun">
               <el-table-column label="整理记录" min-width="300"><template #default="{ row }"><div class="session-title"><span class="run-status-dot" :class="`run-status-dot--${row.status}`"></span><div><strong>{{ row.sessionTitle }}</strong><small>{{ row.id }} · {{ row.sessionId }}</small></div></div></template></el-table-column>
               <el-table-column label="状态" width="120"><template #default="{ row }"><el-tag :type="compileStatusType(row.status)" effect="light" round>{{ compileStatusLabel(row.status) }}</el-tag></template></el-table-column>
               <el-table-column label="处理范围" width="150"><template #default="{ row }"><span class="version-range">v{{ row.fromVersion }} → v{{ row.toVersion }}</span></template></el-table-column>
               <el-table-column label="知识条目" width="110"><template #default="{ row }"><span class="event-count">{{ row.knowledgeCount }}</span></template></el-table-column>
               <el-table-column prop="startedAt" label="开始时间" width="125" />
               <el-table-column prop="duration" label="耗时" width="110" />
-              <el-table-column label="操作" width="120" fixed="right">
+              <el-table-column label="操作" width="120" :fixed="isCompact ? false : 'right'">
                 <template #default="{ row }">
                   <el-button v-if="row.status === 'failed'" text type="primary" :loading="retryingCompileRunId === row.id" :disabled="retryingCompileRunId !== null && retryingCompileRunId !== row.id" @click.stop="retryCompileRun(row)">重试</el-button>
                   <span v-else class="table-action-placeholder">—</span>
@@ -684,18 +733,18 @@ function eventIcon(type) {
                 </div>
                 <el-form label-position="top" class="settings-form" :class="{ 'settings-form--readonly': !knowledgeSettingsEditing }">
                   <el-form-item label="模型选择">
-                    <el-select v-model="selectedModelKeys" class="multi-model-select" popper-class="model-select-popper" multiple filterable collapse-tags :max-collapse-tags="2" placeholder="按顺序选择备用模型" :disabled="!knowledgeSettingsEditing">
+                    <el-select v-model="selectedModelKeys" class="multi-model-select" :popper-options="responsivePopperOptions" popper-class="responsive-select-popper model-select-popper" multiple filterable collapse-tags :max-collapse-tags="2" placeholder="按顺序选择备用模型" :disabled="!knowledgeSettingsEditing">
                       <el-option v-for="option in modelOptions" :key="option.key" :label="option.label" :value="option.key" />
                     </el-select>
                     <div v-if="selectedModels.length" class="selected-model-order">
                       <div v-for="(model, index) in selectedModels" :key="`${model.providerId}::${model.modelName}`" class="selected-model-row">
                         <span class="selected-model-index">{{ index + 1 }}</span>
                         <span class="selected-model-name">{{ model.providerName }} / {{ model.modelName }}</span>
-                        <template v-if="knowledgeSettingsEditing">
+                        <div v-if="knowledgeSettingsEditing" class="selected-model-actions">
                           <el-button text size="small" :disabled="index === 0" @click="moveSelectedModel(index, -1)">上移</el-button>
                           <el-button text size="small" :disabled="index === selectedModels.length - 1" @click="moveSelectedModel(index, 1)">下移</el-button>
                           <el-button text type="danger" size="small" @click="removeSelectedModel(index)">移除</el-button>
-                        </template>
+                        </div>
                       </div>
                     </div>
                     <span class="form-help">按列表顺序逐个尝试模型；某个模型成功后停止，全部失败后任务失败。</span>
@@ -712,12 +761,13 @@ function eventIcon(type) {
               </el-tab-pane>
               <el-tab-pane label="模型供应商" name="providers">
                 <div class="provider-toolbar"><div><strong>模型供应商</strong><span>管理用于知识整理的模型接口</span></div><el-button type="primary" @click="openProviderCreate"><el-icon><Plus /></el-icon>新增供应商</el-button></div>
-                <el-table :data="providers" class="provider-table">
+                <p v-if="isCompact" class="table-scroll-hint">左右滑动查看全部列（含操作），也可聚焦表格后使用方向键</p>
+                <el-table :data="providers" class="provider-table" :scrollbar-tabindex="0">
                   <el-table-column label="供应商" min-width="190"><template #default="{ row }"><div class="provider-name"><span class="provider-mark">{{ row.name.slice(0, 1) }}</span><div><strong>{{ row.name }}</strong><small>{{ row.type }}</small></div></div></template></el-table-column>
                   <el-table-column prop="baseUrl" label="Base URL" min-width="270" />
                   <el-table-column label="可用模型" min-width="220"><template #default="{ row }"><div class="model-tags"><el-tag v-for="model in row.models" :key="model" size="small" effect="plain">{{ model }}</el-tag></div></template></el-table-column>
                   <el-table-column prop="modelsFetchedAt" label="最近获取" width="120" />
-                  <el-table-column label="操作" width="130" fixed="right"><template #default="{ row }"><el-button text type="primary" @click="openProviderEdit(row)"><el-icon><Edit /></el-icon></el-button><el-button text type="danger" @click="deleteProvider(row)"><el-icon><Delete /></el-icon></el-button></template></el-table-column>
+                  <el-table-column label="操作" width="130" :fixed="isCompact ? false : 'right'"><template #default="{ row }"><el-button text type="primary" :aria-label="`编辑供应商：${row.name}`" @click="openProviderEdit(row)"><el-icon><Edit /></el-icon></el-button><el-button text type="danger" :aria-label="`删除供应商：${row.name}`" @click="deleteProvider(row)"><el-icon><Delete /></el-icon></el-button></template></el-table-column>
                 </el-table>
               </el-tab-pane>
             </el-tabs>
@@ -728,13 +778,23 @@ function eventIcon(type) {
       </el-main>
     </el-container>
 
-    <el-drawer v-model="drawerVisible" :title="selectedSession?.title || '会话事件'" :size="isCollapsed ? 'calc(100vw - 72px)' : 'calc(100vw - 240px)'" direction="rtl" class="event-drawer">
+    <el-drawer v-model="mobileNavOpen" title="主导航" direction="ltr" size="min(280px, calc(100vw - 48px))" class="mobile-navigation" @closed="restoreNavigationFocus">
+      <el-menu id="mobile-navigation" :default-active="activeMenu" class="sidebar-menu" aria-label="主导航" @select="selectMenu">
+        <el-menu-item v-for="item in navigationItems" :key="item.index" :index="item.index" :aria-current="activeMenu === item.index ? 'page' : undefined">
+          <el-icon><component :is="item.icon" /></el-icon>
+          <template #title>{{ item.title }}</template>
+        </el-menu-item>
+      </el-menu>
+    </el-drawer>
+
+    <el-drawer v-model="drawerVisible" :title="selectedSession?.title || '会话事件'" :size="businessDrawerSize" direction="rtl" class="business-drawer event-drawer">
       <template #header>
-        <div class="drawer-heading">
+        <div class="drawer-heading" tabindex="0" aria-label="详情标题和状态">
           <div><strong>{{ selectedSession?.title || '会话事件' }}</strong><span>{{ selectedSession?.id }}</span></div>
           <el-tag v-if="selectedSession" :type="statusType(selectedSession.status)" effect="light" round>{{ statusLabel(selectedSession.status) }}</el-tag>
         </div>
       </template>
+      <el-alert v-if="apiError" :title="apiError" type="error" :closable="false" show-icon />
       <div class="drawer-summary">
         <div><span>来源</span><strong>{{ selectedSession?.source }}</strong></div>
         <div><span>事件数</span><strong>{{ selectedSession?.events }}</strong></div>
@@ -751,20 +811,21 @@ function eventIcon(type) {
             <p>{{ event.content }}</p>
             <div v-if="event.type === 'tool_call'" class="tool-call-details">
               <div class="tool-call-field"><span>工具</span><code>{{ event.tool || '未命名工具' }}</code></div>
-              <div class="tool-call-field"><span>参数</span><pre>{{ event.arguments }}</pre></div>
+              <div class="tool-call-field"><span>参数</span><pre tabindex="0" aria-label="工具参数">{{ event.arguments }}</pre></div>
             </div>
             <code v-else-if="event.tool">{{ event.tool }}</code>
           </div>
         </div>
       </div>
     </el-drawer>
-    <el-drawer v-model="compileDrawerVisible" :size="isCollapsed ? 'calc(100vw - 72px)' : 'calc(100vw - 240px)'" direction="rtl" class="compile-drawer" @closed="closeCompileRunDrawer">
+    <el-drawer v-model="compileDrawerVisible" :size="businessDrawerSize" direction="rtl" class="business-drawer compile-drawer" @closed="closeCompileRunDrawer">
       <template #header>
-        <div class="drawer-heading">
+        <div class="drawer-heading" tabindex="0" aria-label="详情标题和状态">
           <div><strong>{{ selectedCompileRun?.sessionTitle || '整理记录' }}</strong><span>{{ selectedCompileRun?.id }} · {{ selectedCompileRun?.sessionId }}</span></div>
           <el-tag v-if="selectedCompileRun" :type="compileStatusType(selectedCompileRun.status)" effect="light" round>{{ compileStatusLabel(selectedCompileRun.status) }}</el-tag>
         </div>
       </template>
+      <el-alert v-if="apiError" :title="apiError" type="error" :closable="false" show-icon />
       <template v-if="selectedCompileRun">
         <el-skeleton v-if="loadingCompileDetail" :rows="6" animated />
         <template v-else>
@@ -798,7 +859,7 @@ function eventIcon(type) {
               <div class="trace-entry-marker"><span v-if="entry.status === 'running'" class="trace-spinner"></span><span v-else-if="entry.status === 'failed'">!</span><span v-else>•</span></div>
               <div class="trace-entry-body">
                 <div class="trace-entry-header"><div><el-tag size="small" effect="plain">{{ traceRoleLabel(entry.role) }}</el-tag><strong>{{ entry.title }}</strong></div><div><el-tag :type="entry.status === 'failed' ? 'danger' : entry.status === 'running' ? 'primary' : 'info'" size="small" effect="light">{{ traceStatusLabel(entry.status) }}</el-tag><time>{{ formatUpdatedAt(entry.createdAt) }}</time></div></div>
-                <pre v-if="entry.content" class="trace-entry-content">{{ entry.content }}</pre>
+                <pre v-if="entry.content" class="trace-entry-content" tabindex="0" aria-label="执行过程内容">{{ entry.content }}</pre>
               </div>
             </article>
           </div>
@@ -811,7 +872,7 @@ function eventIcon(type) {
             <div class="failure-heading"><el-icon><WarningFilled /></el-icon><strong>失败原因</strong></div>
             <el-button type="primary" size="small" :loading="retryingCompileRunId === selectedCompileRun.id" :disabled="retryingCompileRunId !== null && retryingCompileRunId !== selectedCompileRun.id" @click="retryCompileRun(selectedCompileRun)">重试整理</el-button>
           </div>
-          <pre class="failure-message">{{ selectedCompileRun.errorMessage || '任务失败，但服务端没有返回具体错误信息。' }}</pre>
+          <pre class="failure-message" tabindex="0" aria-label="失败原因">{{ selectedCompileRun.errorMessage || '任务失败，但服务端没有返回具体错误信息。' }}</pre>
         </section>
         <section v-if="selectedCompileRun.attempts?.length" class="compile-attempt-section">
           <div class="result-section-title"><span class="result-icon result-icon--attempt">↻</span><strong>模型尝试记录</strong><span class="result-count">{{ selectedCompileRun.attempts.length }}</span></div>
@@ -842,10 +903,10 @@ function eventIcon(type) {
       </template>
     </el-drawer>
 
-    <el-drawer v-model="providerDrawerVisible" :title="providerDrawerMode === 'create' ? '新增模型供应商' : '修改模型供应商'" :size="isCollapsed ? 'calc(100vw - 72px)' : 'calc(100vw - 240px)'" direction="rtl" class="provider-drawer">
+    <el-drawer v-model="providerDrawerVisible" :title="providerDrawerMode === 'create' ? '新增模型供应商' : '修改模型供应商'" :size="businessDrawerSize" direction="rtl" class="business-drawer provider-drawer">
       <el-form label-position="top" class="provider-form">
         <el-form-item label="供应商名称"><el-input v-model="providerForm.name" placeholder="例如：OpenAI" /></el-form-item>
-        <el-form-item label="接口类型"><el-select v-model="providerForm.type" class="full-width"><el-option label="Completions" value="completions" /><el-option label="Responses" value="responses" /><el-option label="Anthropic" value="anthropic" /></el-select></el-form-item>
+        <el-form-item label="接口类型"><el-select v-model="providerForm.type" class="full-width" :popper-options="responsivePopperOptions" popper-class="responsive-select-popper provider-type-popper"><el-option label="Completions" value="completions" /><el-option label="Responses" value="responses" /><el-option label="Anthropic" value="anthropic" /></el-select></el-form-item>
         <el-form-item label="Base URL"><el-input v-model="providerForm.baseUrl" placeholder="https://api.example.com/v1" /></el-form-item>
         <el-form-item label="API Key"><el-input v-model="providerForm.apiKey" type="password" show-password placeholder="输入 API Key" /></el-form-item>
         <el-form-item label="可用模型列表">

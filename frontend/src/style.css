@@ -82,14 +82,7 @@ h1 { margin: 0; color: #172033; font-size: 28px; line-height: 1.2; }
 .session-table .el-progress__text { min-width: 34px; font-size: 11px; }
 .api-status { margin: 16px 2px 0; color: #9aa5b5; font-size: 12px; }
 .mock-hint { margin-left: 10px; color: #c0c8d4; }
-@media (max-width: 700px) {
-  .topbar { padding: 0 16px; }
-  .content-area { padding: 24px 16px 36px; }
-  .page-heading { align-items: flex-start; flex-direction: column; }
-  .user-name, .topbar-right .el-divider { display: none; }
-  .card-header { align-items: flex-start; flex-direction: column; }
-  .search-input { width: 100%; }
-}
+
 
 .drawer-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; width: 100%; padding-right: 8px; }
 .drawer-heading > div { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
@@ -145,7 +138,7 @@ h1 { margin: 0; color: #172033; font-size: 28px; line-height: 1.2; }
 .run-status-dot--running { background: #409eff; box-shadow: 0 0 0 4px rgba(64, 158, 255, .12); }
 .run-status-dot--failed { background: #e56b6f; }
 .version-range { color: #65738a; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
-@media (max-width: 700px) { .session-filter { width: 100%; } }
+
 
 .compile-card .el-table__row { cursor: pointer; }
 .compile-run-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 14px; border: 1px solid #edf0f5; border-radius: 10px; background: #f8fafc; }
@@ -162,7 +155,7 @@ h1 { margin: 0; color: #172033; font-size: 28px; line-height: 1.2; }
 .knowledge-result-list { display: flex; flex-direction: column; gap: 10px; margin: 12px 0 0; padding: 0; list-style: none; }
 .knowledge-result-list li { display: flex; gap: 9px; padding: 10px 12px; border: 1px solid #e4eee8; border-radius: 8px; color: #536b60; background: #f6fcf8; font-size: 12px; line-height: 1.6; }
 .knowledge-bullet { color: #38a878; font-size: 17px; line-height: 1.1; }
-@media (max-width: 800px) { .compile-run-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
 
 .cascading-model-select { display: flex; width: 100%; align-items: center; gap: 12px; }
 .cascading-model-select .el-select { flex: 0 0 auto; }
@@ -194,12 +187,7 @@ h1 { margin: 0; color: #172033; font-size: 28px; line-height: 1.2; }
 .readonly-model-list { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
 .provider-form { padding-bottom: 20px; }
 .drawer-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
-@media (max-width: 800px) {
-  .cascading-model-select { align-items: stretch; flex-direction: column; }
-  .cascading-model-select .provider-select, .cascading-model-select .model-select { width: 100%; min-width: 0; }
-  .select-arrow { display: none; }
-  .provider-toolbar { align-items: flex-start; flex-direction: column; }
-}
+
 
 .settings-tab-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 22px 4px 0; }
 .settings-tab-header > div:first-child { display: flex; flex-direction: column; gap: 5px; }
@@ -269,3 +257,178 @@ h1 { margin: 0; color: #172033; font-size: 28px; line-height: 1.2; }
 .trace-entry-content { max-height: 340px; overflow: auto; margin: 10px 0 0; color: #56657b; font: 12px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 @keyframes trace-spin { to { transform: rotate(360deg); } }
 @keyframes trace-pulse { 50% { opacity: .55; } }
+
+
+/* T01 shared shell: width is 0/72/240px; business content is never keyed by mode.
+   Subsequent table/drawer/form tasks extend these same 767/1199 boundaries. */
+.topbar-left, .topbar-right { min-width: 0; }
+.topbar-left { flex: 1; }
+.collapse-button { flex-shrink: 0; min-width: 44px; min-height: 44px; }
+.breadcrumb { min-width: 0; }
+.breadcrumb strong { overflow-wrap: anywhere; }
+.mobile-navigation { background: var(--sidebar-bg); }
+.mobile-navigation .el-drawer__header { color: #fff; border-color: #334155; }
+.mobile-navigation .el-drawer__close-btn { min-width: 44px; min-height: 44px; color: #fff; }
+.mobile-navigation .el-drawer__body { display: flex; min-height: 0; padding: 12px 0; }
+.mobile-navigation .sidebar-menu { width: 100%; }
+
+/* Former 800px detail rules stay active throughout the shared non-desktop tier. */
+@media (max-width: 1199px) {
+  .compile-run-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cascading-model-select { align-items: stretch; flex-direction: column; }
+  .cascading-model-select .provider-select, .cascading-model-select .model-select { width: 100%; min-width: 0; }
+  .select-arrow { display: none; }
+  .provider-toolbar { align-items: flex-start; flex-direction: column; }
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+  .topbar { padding: 0 24px; }
+  .content-area { padding: 28px 24px 40px; }
+}
+
+@media (max-width: 767px) {
+  .topbar { height: 64px; padding: 0 12px; }
+  .content-area { padding: 24px 16px 36px; }
+  .collapse-button { margin-right: 8px; }
+  .breadcrumb { gap: 0; }
+  .breadcrumb > span, .user-name, .topbar-right .el-divider, .topbar-icon { display: none; }
+  .topbar-right { flex-shrink: 0; margin-left: 8px; }
+  /* Retain the existing compact content rules for the later page-specific tasks. */
+  .page-heading { align-items: flex-start; flex-direction: column; }
+  .card-header { align-items: flex-start; flex-direction: column; }
+  .search-input, .session-filter { width: 100%; }
+}
+
+/* T02: one horizontal scroll owner per table (Element Plus scrollbar).
+   Grid tracks follow the shared 768/1200 thresholds, not el-col's 576px sm. */
+.overview-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.overview-grid:has(> .el-col:nth-child(3):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.overview-grid > .el-col { width: auto; max-width: none; min-width: 0; }
+.page-heading, .page-heading > div, .session-card, .settings-card,
+.card-header, .card-header > div, .provider-toolbar, .provider-toolbar > div { min-width: 0; max-width: 100%; }
+.page-heading, .card-header, .card-header > div { flex-wrap: wrap; }
+.page-description, .api-status, .provider-toolbar { overflow-wrap: anywhere; }
+.metric-icon, .provider-mark { flex-shrink: 0; }
+.metric-card strong, .metric-label, .metric-copy small { overflow-wrap: anywhere; }
+.session-table, .provider-table { min-width: 0; max-width: 100%; }
+.session-title small, .provider-name, .provider-table .cell { overflow-wrap: anywhere; }
+.provider-name, .provider-name > div { min-width: 0; }
+.model-tags .el-tag { max-width: 100%; height: auto; min-height: 20px; white-space: normal; }
+.model-tags .el-tag__content { min-width: 0; overflow-wrap: anywhere; }
+.table-scroll-hint { margin: 0 0 12px; color: #607087; font-size: 12px; line-height: 1.6; }
+.session-table .el-scrollbar__wrap:focus-visible, .provider-table .el-scrollbar__wrap:focus-visible { outline: 2px solid #2d6cdf; outline-offset: -2px; }
+@media (min-width: 768px) and (max-width: 1199px) {
+  .overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 767px) {
+  .overview-grid, .overview-grid:has(> .el-col:nth-child(3):last-child) { grid-template-columns: minmax(0, 1fr); }
+  .page-heading { gap: 16px; }
+  .card-header { align-items: stretch; }
+  .card-header > div { gap: 6px 10px; }
+  .search-input, .session-filter { width: 100%; }
+}
+/* Long status labels must stay readable inside their original 120px column. */
+.session-table .el-tag { max-width: 100%; height: auto; min-height: 24px; white-space: normal; }
+.session-table .el-tag__content { white-space: normal; overflow-wrap: anywhere; }
+
+/* T03 business drawer contract. Keep the original component instances and callbacks;
+   only the body owns vertical scrolling. The header's text can scroll independently
+   for unusually long titles without moving the close button off a short viewport. */
+.business-drawer { min-width: 0; max-width: 100vw; height: 100vh; height: 100dvh; }
+.business-drawer .el-drawer__header { flex: 0 0 auto; min-width: 0; align-items: flex-start; gap: 8px; padding: 16px 20px; }
+.business-drawer .el-drawer__title { min-width: 0; overflow-wrap: anywhere; }
+.business-drawer .el-drawer__close-btn { flex: 0 0 44px; width: 44px; height: 44px; margin: 0; }
+.business-drawer .el-drawer__body { min-width: 0; min-height: 0; padding: 18px 20px calc(24px + env(safe-area-inset-bottom, 0px)); overflow: auto; }
+.business-drawer .drawer-heading { flex: 1; min-width: 0; width: auto; max-height: 28vh; max-height: 28dvh; overflow: auto; padding-right: 0; flex-wrap: wrap; }
+.business-drawer .drawer-heading > div { flex: 1 1 200px; }
+.business-drawer .drawer-heading strong, .business-drawer .drawer-heading span,
+.business-drawer .drawer-summary strong, .business-drawer .compile-run-summary strong { white-space: normal; overflow-wrap: anywhere; overflow: visible; text-overflow: clip; }
+.business-drawer:not(.provider-drawer) .el-tag { flex-shrink: 0; max-width: 100%; min-height: 24px; height: auto; white-space: normal; }
+.business-drawer:not(.provider-drawer) .el-tag__content { min-width: 0; overflow-wrap: anywhere; }
+.drawer-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.drawer-summary > div { min-width: 0; }
+.event-meta, .failure-panel-header, .compile-attempt-header, .trace-entry-header,
+.trace-entry-header > div, .result-section-title, .compile-warning-heading { flex-wrap: wrap; }
+.event-meta > *, .trace-entry-header > div, .compile-trace-live > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.event-bubble p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.event-bubble code { max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tool-call-details, .tool-call-field { min-width: 0; }
+.tool-call-field > pre, .trace-entry-content, .failure-message { max-width: 100%; max-height: 340px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tool-call-field > pre { max-height: 260px; }
+.business-drawer pre:focus-visible { outline: 2px solid #2d6cdf; outline-offset: 2px; }
+.result-summary, .knowledge-result-list li { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.result-icon, .knowledge-bullet { flex-shrink: 0; }
+.business-drawer:not(.provider-drawer) .el-alert__content { min-width: 0; overflow-wrap: anywhere; }
+.compile-failure-section .el-button { min-width: 88px; min-height: 44px; margin-left: 0; }
+@media (min-width: 768px) and (max-width: 1199px) {
+  .drawer-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 767px) {
+  .business-drawer .el-drawer__header { padding: 12px; }
+  .business-drawer .el-drawer__body { padding: 16px 12px calc(24px + env(safe-area-inset-bottom, 0px)); }
+  .business-drawer .drawer-heading > div { flex-basis: 100%; }
+  .drawer-summary, .compile-run-summary { grid-template-columns: minmax(0, 1fr); }
+  .event-item { gap: 8px; }
+  .event-bubble, .trace-entry-body { padding: 10px; }
+  .trace-entry-header { align-items: flex-start; flex-direction: column; }
+  .compile-warning-section, .compile-failure-section, .compile-attempt-card { padding: 12px; }
+}
+
+/* T04: flow-based settings and provider inner form. Drawer shell/size stays T03's. */
+.settings-tab-header, .settings-tab-header > div, .settings-tab-actions,
+.settings-form, .settings-form .el-form-item__content,
+.provider-form, .provider-form .el-form-item__content { min-width: 0; max-width: 100%; }
+.settings-tab-header { flex-wrap: wrap; }
+.settings-tab-actions { flex-wrap: wrap; }
+.settings-tab-actions .el-button + .el-button { margin-left: 0; }
+.settings-form .el-textarea, .selected-model-order { width: 100%; }
+.selected-model-row { min-width: 0; flex-wrap: wrap; }
+.selected-model-index { flex: 0 0 22px; }
+.selected-model-name { overflow: visible; white-space: normal; overflow-wrap: anywhere; text-overflow: clip; }
+.selected-model-actions { display: flex; flex: 0 0 auto; flex-wrap: wrap; gap: 4px; }
+.selected-model-actions .el-button { min-width: 44px; min-height: 44px; margin-left: 0; }
+.interval-input { min-width: 0; max-width: 100%; flex-wrap: wrap; }
+.interval-input .el-input-number { max-width: 100%; }
+.form-help { width: 100%; overflow-wrap: anywhere; }
+.provider-form { width: 100%; }
+.models-fetch-row { width: 100%; min-width: 0; flex-wrap: wrap; }
+.models-fetch-row .form-help { width: auto; margin-top: 0; }
+.readonly-model-list { width: 100%; min-width: 0; }
+.readonly-model-list .el-tag { min-width: 0; max-width: 100%; height: auto; min-height: 24px; white-space: normal; }
+.readonly-model-list .el-tag__content { min-width: 0; overflow-wrap: anywhere; }
+.provider-form .el-alert__content { min-width: 0; overflow-wrap: anywhere; }
+.drawer-actions { flex-wrap: wrap; }
+.drawer-actions .el-button + .el-button { margin-left: 0; }
+/* Teleported poppers need named root classes, not ancestor-dependent overrides.
+   Verified against the locked Element Plus 2.14.5 select/scrollbar/message DOM. */
+.responsive-select-popper { box-sizing: border-box; max-width: calc(100vw - 24px); }
+.responsive-select-popper .el-select-dropdown { max-width: 100%; }
+.responsive-select-popper .el-select-dropdown__wrap { max-height: min(274px, 45vh); max-height: min(274px, 45dvh); }
+.responsive-select-popper .el-select-dropdown__item { height: auto; min-height: 34px; padding-top: 8px; padding-bottom: 8px; line-height: 1.5; white-space: normal; overflow-wrap: anywhere; }
+.responsive-select-popper .el-select-dropdown__empty { white-space: normal; overflow-wrap: anywhere; }
+.responsive-feedback { max-width: calc(100vw - 24px); }
+.responsive-feedback .el-message__content { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.responsive-feedback .el-message__closeBtn { display: grid; place-items: center; width: 44px; height: 44px; right: 0; }
+.responsive-feedback.is-closable .el-message__content { padding-right: 32px; }
+@media (max-width: 767px) {
+  .settings-card, .settings-tabs { min-height: 0; }
+  .settings-tab-header { align-items: stretch; flex-direction: column; gap: 16px; }
+  .settings-tab-actions { width: 100%; }
+  .settings-tab-actions .el-button { flex: 1; min-height: 44px; }
+  .settings-form { padding: 20px 0 calc(24px + env(safe-area-inset-bottom, 0px)); }
+  .selected-model-row { display: grid; grid-template-columns: 22px minmax(0, 1fr); align-items: start; }
+  .selected-model-actions { grid-column: 1 / -1; justify-content: flex-end; }
+  .models-fetch-row { align-items: stretch; flex-direction: column; }
+  .models-fetch-row .el-button { align-self: flex-start; min-height: 44px; }
+  .drawer-actions .el-button { flex: 1; min-height: 44px; }
+  .provider-table .el-button { min-width: 44px; min-height: 44px; padding: 8px; margin-left: 0; }
+  .provider-toolbar > .el-button { min-height: 44px; }
+  .settings-form .el-input__inner, .settings-form .el-textarea__inner,
+  .settings-form .el-select__input, .provider-form .el-input__inner,
+  .provider-form .el-select__input { font-size: 16px; }
+  .responsive-select-popper .el-select-dropdown__item { min-height: 44px; }
+}
+/* Message's icon is a flex item in 2.14.5: long text must not shrink its hit area. */
+.responsive-feedback { max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); }
+.responsive-feedback .el-message__content { max-height: calc(100vh - 64px); max-height: calc(100dvh - 64px); overflow: auto; }
+.responsive-feedback .el-message__closeBtn { flex-shrink: 0; }
